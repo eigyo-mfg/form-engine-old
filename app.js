@@ -14,7 +14,7 @@ async function run() {
         }
     });
 
-    await page.goto('https://www.system-west.co.jp/subpage10.html', { waitUntil: 'networkidle0' });
+    await page.goto('https://sales-bank.com/contact/', { waitUntil: 'networkidle0' });
 
     // Wait for the form tag to be rendered
     await page.waitForSelector('form');
@@ -26,6 +26,8 @@ async function run() {
     $('form').each(function() {
         formsHTML.push($(this).html());
     });
+
+    console.log(formsHTML);
 
     // If no form is found, look for iframe
     if (formsHTML.length === 0) {
@@ -50,10 +52,22 @@ async function run() {
     // Find the longest form HTML
     let longestFormHTML = formsHTML.reduce((a, b) => a.length > b.length ? a : b, "");
 
-    console.log(longestFormHTML);
+    // Check if the HTML is malformed
+    const malformedHtmlRegex = /<([a-z][a-z0-9]*)\b[^>]*>(.*?)<\/\1>/g;
+    if (!malformedHtmlRegex.test(longestFormHTML)) {
+        console.log("The HTML is malformed. Executing alternative process...");
+
+        // Extract form content using regex
+        const formRegex = /<form[^>]*>([\s\S]*?)<\/form>/gi;
+        let match;
+        while ((match = formRegex.exec(html)) !== null) {
+            console.log("Found a form: ", match[0]);
+        }
+    } else {
+        console.log(longestFormHTML);
+    }
 
     await browser.close();
 }
 
 run().catch(console.error);
-
