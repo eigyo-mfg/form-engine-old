@@ -1,5 +1,9 @@
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
+const axios = require('axios'); // axiosをインポート
+const iconv = require('iconv-lite'); // iconv-liteをiconvという名前でインポート
+
+const url = 'http://csmltd.jp/contact.html'; // URLを変数に格納
 
 async function run() {
     const browser = await puppeteer.launch();
@@ -14,7 +18,7 @@ async function run() {
         }
     });
 
-    await page.goto('https://www.athlead.co.jp/contact.html', { waitUntil: 'networkidle0' });
+    await page.goto(url, { waitUntil: 'networkidle0' }); // 変数urlを使用
 
     const html = await page.content();
     const $ = cheerio.load(html);
@@ -86,10 +90,14 @@ async function run() {
     if (!malformedHtmlRegex.test(longestFormHTML)) {
         console.log("The HTML is malformed. Executing alternative process...");
 
-        // Extract form content using regex
+        // Use axios to get raw HTML
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const rawHtml = iconv.decode(Buffer.from(response.data), 'Shift_JIS'); // Shift-JISからUTF-8に変換
+
+        // Extract form content from raw HTML using regex
         const formRegex = /<form[^>]*>([\s\S]*?)<\/form>/gi;
         let match;
-        while ((match = formRegex.exec(html)) !== null) {
+        while ((match = formRegex.exec(rawHtml)) !== null) {
             console.log("Found a form: ", match[0]);
         }
     } else {
@@ -100,4 +108,3 @@ async function run() {
 }
 
 run().catch(console.error);
-
