@@ -14,10 +14,7 @@ async function run() {
         }
     });
 
-    await page.goto('https://sales-bank.com/contact/', { waitUntil: 'networkidle0' });
-
-    // Wait for the form tag to be rendered
-    await page.waitForSelector('form');
+    await page.goto('https://www.tgl.co.jp/emp/inquiry.php', { waitUntil: 'networkidle0' });
 
     const html = await page.content();
     const $ = cheerio.load(html);
@@ -31,22 +28,27 @@ async function run() {
 
     // If no form is found, look for iframe
     if (formsHTML.length === 0) {
-        $('iframe').each(async function() {
-            const iframeSrc = $(this).attr('src');
-            if (iframeSrc) {
-                const iframePage = await browser.newPage();
-                await iframePage.goto(iframeSrc, { waitUntil: 'networkidle0' });
+        const iframes = await page.$$('iframe');
+        for (let iframe of iframes) {
+            try {
+                const frame = await iframe.contentFrame();
+                await frame.waitForSelector('form', { timeout: 5000 });
 
-                // Wait for the form tag to be rendered in the iframe
-                await iframePage.waitForSelector('form');
-
-                const iframeHTML = await iframePage.content();
+                const iframeHTML = await frame.content();
                 const $iframe = cheerio.load(iframeHTML);
                 $iframe('form').each(function() {
                     formsHTML.push($iframe(this).html());
                 });
+            } catch (error) {
+                console.log('No form found in this iframe');
             }
-        });
+        }
+    }
+
+    if (formsHTML.length === 0) {
+        console.log("No form found. Exiting...");
+        await browser.close();
+        return;
     }
 
     // Find the longest form HTML
