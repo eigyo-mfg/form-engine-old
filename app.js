@@ -21,7 +21,10 @@ async function run() {
 
     let formsHTML = [];
     $('form').each(function() {
-        formsHTML.push($(this).html());
+        // Check if the form is not a search form
+        if ($(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+            formsHTML.push($(this).html());
+        }
     });
 
     console.log(formsHTML);
@@ -37,7 +40,10 @@ async function run() {
                 const iframeHTML = await frame.content();
                 const $iframe = cheerio.load(iframeHTML);
                 $iframe('form').each(function() {
-                    formsHTML.push($iframe(this).html());
+                    // Check if the form is not a search form
+                    if ($iframe(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+                        formsHTML.push($iframe(this).html());
+                    }
                 });
             } catch (error) {
                 console.log('No form found in this iframe');
@@ -55,7 +61,10 @@ async function run() {
                 const newHtml = await page.content();
                 const $new = cheerio.load(newHtml);
                 $new('form').each(function() {
-                    formsHTML.push($new(this).html());
+                    // Check if the form is not a search form
+                    if ($new(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+                        formsHTML.push($new(this).html());
+                    }
                 });
             }
         } catch (error) {
@@ -91,3 +100,4 @@ async function run() {
 }
 
 run().catch(console.error);
+
