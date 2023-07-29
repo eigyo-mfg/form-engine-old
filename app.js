@@ -14,7 +14,7 @@ async function run() {
         }
     });
 
-    await page.goto('https://www.tgl.co.jp/emp/inquiry.php', { waitUntil: 'networkidle0' });
+    await page.goto('https://www.athlead.co.jp/contact.html', { waitUntil: 'networkidle0' });
 
     const html = await page.content();
     const $ = cheerio.load(html);
@@ -42,6 +42,24 @@ async function run() {
             } catch (error) {
                 console.log('No form found in this iframe');
             }
+        }
+    }
+
+    // If no form is found, look for agreement button
+    if (formsHTML.length === 0) {
+        try {
+            const [button] = await page.$x("//input[@value='同意します' or @value='同意する']");
+            if (button) {
+                await button.click();
+                await page.waitForNavigation({ waitUntil: 'networkidle0' });
+                const newHtml = await page.content();
+                const $new = cheerio.load(newHtml);
+                $new('form').each(function() {
+                    formsHTML.push($new(this).html());
+                });
+            }
+        } catch (error) {
+            console.log('No agreement button found');
         }
     }
 
