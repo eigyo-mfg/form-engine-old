@@ -3,7 +3,7 @@ const cheerio = require('cheerio');
 const axios = require('axios');
 const iconv = require('iconv-lite');
 
-const url = 'https://www.nttdata-kansai.co.jp/form/inquiry/';
+const url = 'https://www.supertool.co.jp/inquiry/product.php';
 
 async function run() {
     const browser = await puppeteer.launch();
@@ -22,10 +22,9 @@ async function run() {
 
     const html = await page.content();
     let $ = cheerio.load(html);
-
     let formsHTML = [];
     $('form').each(function() {
-        if ($(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+        if (!$(this).hasClass('gsc-search-box') && $(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
             formsHTML.push($(this).html());
         }
     });
@@ -40,12 +39,13 @@ async function run() {
                 const iframeHTML = await frame.content();
                 const $iframe = cheerio.load(iframeHTML);
                 $iframe('form').each(function() {
-                    if ($iframe(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+                    if (!$iframe(this).hasClass('gsc-search-box') && $iframe(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+                        formsHTML.push($iframe(this).html());
                         formsHTML.push($iframe(this).html());
                     }
                 });
             } catch (error) {
-                console.log('No form found in this iframe');
+                console.log('No form found in this iframe. Error:', error);
             }
         }
     }
@@ -59,7 +59,7 @@ async function run() {
                 const newHtml = await page.content();
                 const $new = cheerio.load(newHtml);
                 $new('form').each(function() {
-                    if ($new(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+                    if (!$new(this).hasClass('gsc-search-box') && $new(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
                         formsHTML.push($new(this).html());
                     }
                 });
