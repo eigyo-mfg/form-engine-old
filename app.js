@@ -3,7 +3,7 @@ const cheerio = require('cheerio');
 const axios = require('axios'); // axiosをインポート
 const iconv = require('iconv-lite'); // iconv-liteをiconvという名前でインポート
 
-const url = 'https://www.kajitech.com/contact/products/'; // URLを変数に格納
+const url = 'https://www.shoei-corp.co.jp/contact/index.html'; // URLを変数に格納
 
 async function run() {
     const browser = await puppeteer.launch();
@@ -58,7 +58,7 @@ async function run() {
     // If no form is found, look for agreement button
     if (formsHTML.length === 0) {
         try {
-            const [button] = await page.$x("//input[@value='同意します' or @value='同意する']");
+            const [button] = await page.$x("//input[@value='同意します' or @value='同意する' or @value='同意しますか？'] | //a[contains(descendant::text(), '同意します') or contains(descendant::text(), '同意する') or contains(descendant::text(), '同意しますか？')]");
             if (button) {
                 await button.click();
                 await page.waitForNavigation({ waitUntil: 'networkidle0' });
