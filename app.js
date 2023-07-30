@@ -3,7 +3,7 @@ const cheerio = require('cheerio');
 const axios = require('axios'); // axiosをインポート
 const iconv = require('iconv-lite'); // iconv-liteをiconvという名前でインポート
 
-const url = 'http://csmltd.jp/contact.html'; // URLを変数に格納
+const url = 'https://www.kajitech.com/contact/products/'; // URLを変数に格納
 
 async function run() {
     const browser = await puppeteer.launch();
