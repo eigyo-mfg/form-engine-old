@@ -24,7 +24,7 @@ async function run() {
     let $ = cheerio.load(html);
     let formsHTML = [];
     $('form').each(function() {
-        if (!$(this).hasClass('gsc-search-box') && $(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+        if ($(this).find('input').length > 1) {
             formsHTML.push($(this).html());
         }
     });
@@ -39,8 +39,7 @@ async function run() {
                 const iframeHTML = await frame.content();
                 const $iframe = cheerio.load(iframeHTML);
                 $iframe('form').each(function() {
-                    if (!$iframe(this).hasClass('gsc-search-box') && $iframe(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
-                        formsHTML.push($iframe(this).html());
+                    if ($iframe(this).find('input').length > 1) {
                         formsHTML.push($iframe(this).html());
                     }
                 });
@@ -59,7 +58,7 @@ async function run() {
                 const newHtml = await page.content();
                 const $new = cheerio.load(newHtml);
                 $new('form').each(function() {
-                    if (!$new(this).hasClass('gsc-search-box') && $new(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+                    if ($new(this).find('input').length > 1) {
                         formsHTML.push($new(this).html());
                     }
                 });
