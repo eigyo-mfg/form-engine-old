@@ -3,7 +3,7 @@ const cheerio = require('cheerio');
 const axios = require('axios');
 const iconv = require('iconv-lite');
 
-const url = 'https://www.supertool.co.jp/inquiry/product.php';
+const url = 'https://www.tsurigane.com/login/inquiryedit';
 
 async function run() {
     const browser = await puppeteer.launch();
@@ -13,12 +13,29 @@ async function run() {
     page.on('request', (req) => {
         if (req.url().includes('www.google-analytics.com')) {
             req.abort();
+        } else if (['image', 'stylesheet', 'font'].indexOf(req.resourceType()) !== -1) {
+            req.abort();
         } else {
             req.continue();
         }
     });
 
-    await page.goto(url, { waitUntil: 'networkidle0' });
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 10000 });
+
+    try {
+        const [checkbox] = await page.$x("//input[@type='checkbox']");
+        if (checkbox) {
+            await checkbox.click();
+        }
+        const [button] = await page.$x("//input[@value='同意します' or @value='同意する' or @value='同意しますか？' or @type='image'] | //a[contains(text(), '同意します') or contains(text(), '同意する') or contains(text(), '同意しますか？') or contains(span, '同意する')]");
+        if (button) {
+            const navigationPromise = page.waitForNavigation({timeout: 10000});
+            await button.click();
+            await navigationPromise;
+        }
+    } catch (error) {
+        console.log('No agreement button found');
+    }
 
     const html = await page.content();
     let $ = cheerio.load(html);
@@ -46,25 +63,6 @@ async function run() {
             } catch (error) {
                 console.log('No form found in this iframe. Error:', error);
             }
-        }
-    }
-
-    if (formsHTML.length === 0) {
-        try {
-            const [button] = await page.$x("//input[@value='同意します' or @value='同意する' or @value='同意しますか？'] | //a[contains(text(), '同意します') or contains(text(), '同意する') or contains(text(), '同意しますか？')]");
-            if (button) {
-                await button.click();
-                await page.waitFor(3000);
-                const newHtml = await page.content();
-                const $new = cheerio.load(newHtml);
-                $new('form').each(function() {
-                    if ($new(this).find('input').length > 1) {
-                        formsHTML.push($new(this).html());
-                    }
-                });
-            }
-        } catch (error) {
-            console.log('No agreement button found');
         }
     }
 
