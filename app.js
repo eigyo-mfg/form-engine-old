@@ -3,7 +3,7 @@ const cheerio = require('cheerio');
 const axios = require('axios');
 const iconv = require('iconv-lite');
 
-const url = 'https://www.tsurigane.com/login/inquiryedit';
+const url = 'https://www.e-sunfarm.co.jp/login/inquiryedit';
 
 async function run() {
     const browser = await puppeteer.launch();
@@ -27,7 +27,7 @@ async function run() {
         if (checkbox) {
             await checkbox.click();
         }
-        const [button] = await page.$x("//input[@value='同意します' or @value='同意する' or @value='同意しますか？' or @type='image'] | //a[contains(text(), '同意します') or contains(text(), '同意する') or contains(text(), '同意しますか？') or contains(span, '同意する')]");
+        const [button] = await page.$x("//input[contains(@value, '同意') or @type='image'] | //a[contains(text(), '同意')] | //span[contains(text(), '同意')]");
         if (button) {
             const navigationPromise = page.waitForNavigation({timeout: 10000});
             await button.click();
@@ -42,7 +42,9 @@ async function run() {
     let formsHTML = [];
     $('form').each(function() {
         if ($(this).find('input').length > 1) {
-            formsHTML.push($(this).html());
+            if ($(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+                formsHTML.push($(this).html());
+            }
         }
     });
 
@@ -85,31 +87,23 @@ async function run() {
         let match;
         while ((match = formRegex.exec(rawHtml)) !== null) {
             console.log("Found a form: ", match[0]);
+    }
+} else {
+    $ = cheerio.load(longestFormHTML);
+    $('*').contents().each(function() {
+        if (this.type === 'comment') $(this).remove();
+    });
+    $('img, br, a').remove();
+    $('*').each(function() {
+        if ($(this).children().length === 0 && $(this).text().trim().length === 0) {
+            $(this).remove();
         }
-    } else {
-        $ = cheerio.load(longestFormHTML);
-
-        // Remove comments
-        $('*').contents().each(function() {
-            if (this.type === 'comment') $(this).remove();
-        });
-
-        // Remove unnecessary tags
-        $('img, br, a').remove();
-
-        // Remove empty elements
-        $('*').each(function() {
-            if ($(this).children().length === 0 && $(this).text().trim().length === 0) {
-                $(this).remove();
-            }
-        });
-
-        // Remove options if more than 10
-        $('select').each(function() {
-            if ($(this).children('option').length > 10) {
-                $(this).children('option').remove();
-            }
-        });
+    });
+    $('select').each(function() {
+        if ($(this).children('option').length > 10) {
+            $(this).children('option').remove();
+        }
+    });
 
         // Remove newlines and spaces between tags
         longestFormHTML = $.html().replace(/\n/g, '').replace(/>\s+</g, '><');
