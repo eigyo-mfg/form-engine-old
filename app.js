@@ -1,9 +1,11 @@
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
 const axios = require('axios');
+const jschardet = require('jschardet');
 const iconv = require('iconv-lite');
 
-const url = 'https://www.e-sunfarm.co.jp/login/inquiryedit';
+
+const url = 'http://csmltd.jp/contact.html';
 
 async function run() {
     const browser = await puppeteer.launch();
@@ -68,26 +70,30 @@ async function run() {
         }
     }
 
-    if (formsHTML.length === 0) {
-        console.log("No form found. Exiting...");
-        await browser.close();
-        return;
-    }
-
     let longestFormHTML = formsHTML.reduce((a, b) => a.length > b.length ? a : b, "");
 
-    const malformedHtmlRegex = /<([a-z][a-z0-9]*)\b[^>]*>(.*?)<\/\1>/g;
-    if (!malformedHtmlRegex.test(longestFormHTML)) {
-        console.log("The HTML is malformed. Executing alternative process...");
-
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
-        const rawHtml = iconv.decode(Buffer.from(response.data), 'Shift_JIS');
-
-        const formRegex = /<form[^>]*>([\s\S]*?)<\/form>/gi;
-        let match;
-        while ((match = formRegex.exec(rawHtml)) !== null) {
-            console.log("Found a form: ", match[0]);
-    }
+    if (longestFormHTML .length === 0) {
+        console.log("No form found in the initial HTML. Trying to fetch raw HTML...");
+        await page.setRequestInterception(true);
+        page.on('response', async (response) => {
+            if (response.url() === url && response.request().resourceType() === 'document') {
+                const source_website_html_content = await response.text();
+                console.log("ソースHTML", source_website_html_content);
+                const formRegex = /<form[^>]*>([\s\S]*?)<\/form>/gi;
+                let match;
+                let form_found = false;
+                while ((match = formRegex.exec(source_website_html_content)) !== null) {        
+                    longestFormHTML += match[0]; 
+                    form_found = true;
+                }
+                if (!form_found) {
+                    console.log("No form found. Exiting...");
+                }
+            }
+        });
+        await page.goto(url);
+        await page.setRequestInterception(true);
+        
 } else {
     $ = cheerio.load(longestFormHTML);
     $('*').contents().each(function() {
@@ -95,7 +101,7 @@ async function run() {
     });
     $('img, br, a').remove();
     $('*').each(function() {
-        if ($(this).children().length === 0 && $(this).text().trim().length === 0) {
+        if (this.name !== 'input' && $(this).children().length === 0 && $(this).text().trim().length === 0) {
             $(this).remove();
         }
     });
@@ -104,10 +110,7 @@ async function run() {
             $(this).children('option').remove();
         }
     });
-
-        // Remove newlines and spaces between tags
         longestFormHTML = $.html().replace(/\n/g, '').replace(/>\s+</g, '><');
-
         console.log(longestFormHTML);
     }
 
