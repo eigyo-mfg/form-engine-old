@@ -5,7 +5,7 @@ const jschardet = require('jschardet');
 const iconv = require('iconv-lite');
 
 
-const url = 'http://csmltd.jp/contact.html';
+const url = 'http://all-brush.com/contact/index.php';
 
 async function run() {
     const browser = await puppeteer.launch();
@@ -75,24 +75,25 @@ async function run() {
     if (longestFormHTML .length === 0) {
         console.log("No form found in the initial HTML. Trying to fetch raw HTML...");
         await page.setRequestInterception(true);
+        let responseProcessingPromise = null;
         page.on('response', async (response) => {
             if (response.url() === url && response.request().resourceType() === 'document') {
-                const source_website_html_content = await response.text();
-                console.log("ソースHTML", source_website_html_content);
-                const formRegex = /<form[^>]*>([\s\S]*?)<\/form>/gi;
-                let match;
-                let form_found = false;
-                while ((match = formRegex.exec(source_website_html_content)) !== null) {        
-                    longestFormHTML += match[0]; 
-                    form_found = true;
-                }
-                if (!form_found) {
-                    console.log("No form found. Exiting...");
-                }
+                responseProcessingPromise = (async () => {
+                    const source_website_html_content = await response.text();
+                    const startIndex = source_website_html_content.indexOf('form');
+                    const endIndex = source_website_html_content.lastIndexOf('form') + 'form'.length;
+                    return source_website_html_content.slice(startIndex, endIndex); // longestFormHTMLを返す
+                })();
             }
         });
         await page.goto(url);
         await page.setRequestInterception(true);
+        if (responseProcessingPromise) {
+            longestFormHTML = await responseProcessingPromise; // 戻り値をlongestFormHTMLに代入
+        }
+    }
+    if (longestFormHTML.length === 0) {
+        console.log("No form found. Exiting...");
         
 } else {
     $ = cheerio.load(longestFormHTML);
