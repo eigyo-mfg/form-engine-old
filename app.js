@@ -1,18 +1,19 @@
+// 必要なモジュールのインポート
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
-const axios = require('axios');
-const jschardet = require('jschardet');
-const iconv = require('iconv-lite');
 
+// 対象のURLの定義
+const url = 'https://www.system-keisoku.co.jp/inquiry/';
 
-const url = 'http://all-brush.com/contact/index.php';
-
+// メインの非同期関数の定義
 async function run() {
+    // ブラウザとページの設定
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
-
+    // リクエストの監視設定
     await page.setRequestInterception(true);
     page.on('request', (req) => {
+         // Google Analyticsと画像、スタイルシート、フォントのリクエストを中止
         if (req.url().includes('www.google-analytics.com')) {
             req.abort();
         } else if (['image', 'stylesheet', 'font'].indexOf(req.resourceType()) !== -1) {
@@ -21,10 +22,11 @@ async function run() {
             req.continue();
         }
     });
-
+    // ページへの移動と要素のクリック
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 10000 });
 
     try {
+        // チェックボックスと同意ボタンのクリック処理
         const [checkbox] = await page.$x("//input[@type='checkbox']");
         if (checkbox) {
             await checkbox.click();
@@ -38,7 +40,7 @@ async function run() {
     } catch (error) {
         console.log('No agreement button found');
     }
-
+    // formタグを抽出
     const html = await page.content();
     let $ = cheerio.load(html);
     let formsHTML = [];
@@ -49,7 +51,7 @@ async function run() {
             }
         }
     });
-
+    // formタグが見つからない場合、iframe内のformタグを抽出
     if (formsHTML.length === 0) {
         const iframes = await page.$$('iframe');
         for (let iframe of iframes) {
@@ -69,9 +71,9 @@ async function run() {
             }
         }
     }
-
+    // 複数HTMLが取得されている場合は長いHTMLを優先
     let longestFormHTML = formsHTML.reduce((a, b) => a.length > b.length ? a : b, "");
-
+    // 最後にformが見つかっていない場合は生のHTMLを取得しform-form部分を抜き出す
     if (longestFormHTML .length === 0) {
         console.log("No form found in the initial HTML. Trying to fetch raw HTML...");
         await page.setRequestInterception(true);
@@ -82,7 +84,14 @@ async function run() {
                     const source_website_html_content = await response.text();
                     const startIndex = source_website_html_content.indexOf('form');
                     const endIndex = source_website_html_content.lastIndexOf('form') + 'form'.length;
-                    return source_website_html_content.slice(startIndex, endIndex); // longestFormHTMLを返す
+                    const formHTML = source_website_html_content.slice(startIndex, endIndex);
+                    const $ = cheerio.load(formHTML);
+                    if ($('input').length > 1 &&
+                    $('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+                        return formHTML;
+                    } else {
+                        return "";
+                    }
                 })();
             }
         });
@@ -96,6 +105,7 @@ async function run() {
         console.log("No form found. Exiting...");
         
 } else {
+    // 不要なHTMLを削除し短文化
     $ = cheerio.load(longestFormHTML);
     $('*').contents().each(function() {
         if (this.type === 'comment') $(this).remove();
