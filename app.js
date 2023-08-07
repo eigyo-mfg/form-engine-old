@@ -1,9 +1,16 @@
+require('dotenv').config();
+
 // 必要なモジュールのインポート
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
+const { Configuration, OpenAIApi } = require("openai");
+const configuration = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY,
+});
+const openai = new OpenAIApi(configuration);
 
 // 対象のURLの定義
-const url = 'https://www.system-keisoku.co.jp/inquiry/';
+const url = 'https://sales-bank.com/contact/';
 
 // メインの非同期関数の定義
 async function run() {
@@ -104,25 +111,35 @@ async function run() {
     if (longestFormHTML.length === 0) {
         console.log("No form found. Exiting...");
         
-} else {
-    // 不要なHTMLを削除し短文化
-    $ = cheerio.load(longestFormHTML);
-    $('*').contents().each(function() {
-        if (this.type === 'comment') $(this).remove();
-    });
-    $('img, br, a').remove();
-    $('*').each(function() {
-        if (this.name !== 'input' && $(this).children().length === 0 && $(this).text().trim().length === 0) {
-            $(this).remove();
-        }
-    });
-    $('select').each(function() {
-        if ($(this).children('option').length > 10) {
-            $(this).children('option').remove();
-        }
-    });
+    } else {
+        // 不要なHTMLを削除し短文化
+        $ = cheerio.load(longestFormHTML);
+        $('*').contents().each(function() {
+            if (this.type === 'comment') $(this).remove();
+        });
+        $('img, br, a').remove();
+        $('*').each(function() {
+            if ((this.name !== 'input'||this.name !== 'textarea')  && $(this).children().length === 0 && $(this).text().trim().length === 0) {
+                $(this).remove();
+            }  
+        });
+        $('select').each(function() {
+            if ($(this).children('option').length > 10) {
+                $(this).children('option').remove();//GPTに聞いて修正
+            }
+        });
         longestFormHTML = $.html().replace(/\n/g, '').replace(/>\s+</g, '><');
         console.log(longestFormHTML);
+        const completion = await openai.createChatCompletion({
+            model: "gpt-4-0613",
+            messages: [
+                {"role": "system", "content": "あなたは世界でも有数のエンジニアです。特にHTMLの解析を得意としております。"},
+                {"role": "user", "content": `HTMLを解析して、どんな内容を入力すべきか教えてください。: ${longestFormHTML}`}
+            ],
+        });
+
+        console.log(completion.data.choices[0].message);
+
     }
 
     await browser.close();
