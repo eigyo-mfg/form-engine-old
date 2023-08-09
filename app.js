@@ -15,7 +15,7 @@ const url = 'https://sales-bank.com/contact/';
 // メインの非同期関数の定義
 async function run() {
     // ブラウザとページの設定
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({ headless: false });
     const page = await browser.newPage();
     // リクエストの監視設定
     await page.setRequestInterception(true);
@@ -119,30 +119,125 @@ async function run() {
         });
         $('img, br, a').remove();
         $('*').each(function() {
-            if ((this.name !== 'input'||this.name !== 'textarea')  && $(this).children().length === 0 && $(this).text().trim().length === 0) {
+            if ((this.name !== 'input' && this.name !== 'textarea') && $(this).children().length === 0 && $(this).text().trim().length === 0) {
                 $(this).remove();
             }  
         });
         $('select').each(function() {
             if ($(this).children('option').length > 10) {
-                $(this).children('option').remove();//GPTに聞いて修正
+                (this).children('option').slice(10).remove(); 
             }
         });
-        longestFormHTML = $.html().replace(/\n/g, '').replace(/>\s+</g, '><');
-        console.log(longestFormHTML);
-        const completion = await openai.createChatCompletion({
-            model: "gpt-4-0613",
-            messages: [
-                {"role": "system", "content": "あなたは世界でも有数のエンジニアです。特にHTMLの解析を得意としております。"},
-                {"role": "user", "content": `HTMLを解析して、どんな内容を入力すべきか教えてください。: ${longestFormHTML}`}
-            ],
-        });
+        try {
+            longestFormHTML = $.html().replace(/\n/g, '').replace(/>\s+</g, '><');
+            console.log(longestFormHTML);
 
-        console.log(completion.data.choices[0].message);
+            const promptContent = `HTMLを解析して、以下の項目に対応する"name"属性を見つけてください。期待するJSON形式は以下のような構造です:
+            {
+              "fields": [
+                {"items": [{"name": "企業名", "value": "name_attribute_here", "type": "input_type_here"}]}
+                // 他の項目も同様に
+              ]
+            }
+            valueは下記のいずれかを推論して選択してください。一歩づつ段階的に考えて実行してください。
+            company,name,kanjiFirstname,kanjiLastname,huriFirstname,huriLastname,email,電話番号,postCode,address,contenttype,sendtype,otherContents.
+            各項目はinputタグの"name"属性に対応していると考えられます。
+            以下の形式でJSONを返してください。
+            \`\`\`json
+            {
+              "fields": [
+                {"items": [{"name": "企業名", "value": "name_attribute_here", "type": "input_type_here"}]}
+                // 他の項目も同様に
+              ]
+            }
+            解析するHTMLは以下の通りです: ${longestFormHTML}
+            \`\`\``
+            
+            const completion = await openai.createChatCompletion({
+                model: "gpt-4",
+                messages: [
+                    {"role": "system", "content": "あなたは世界でも有数のエンジニアです。特にHTMLの解析を得意としております。"},
+                    {"role": "user", "content": promptContent}
+                ],
+            });
 
+            console.log(completion.data.choices[0].message);
+
+            const responseContent = completion.data.choices[0].message.content;
+            const jsonString = responseContent.match(/```json\s+([^`]+)```/)[1];
+            const extractedJSON = JSON.parse(jsonString);
+            console.log(JSON.stringify(extractedJSON, null, 2));
+
+            const dataToSend = {
+                company: "営業製作所株式会社",
+                name: "西島本　周",
+                kanjiFirstname:"西島本",
+                kanjiLastname:"周",
+                huriFirstname: "にししまもと",
+                huriLastname: "しゅう",
+                email: "nishishimamoto@sales-bank.com",
+                電話番号: "080-4024-7677",
+                postCode: "550-0002",
+                address: "大阪府大阪市西区江戸堀1-22-38　三洋ビル501",
+                contenttype: "テスト",
+                sendtype: "メール",
+                otherContents: "テスト"
+            };
+
+
+            const extractedFields = extractedJSON.fields; 
+            const extractedFieldsString = JSON.stringify(extractedFields);
+            page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+            await page.evaluate((dataToSend, extractedFieldsString) => {
+                const extractedFields = JSON.parse(extractedFieldsString);
+                console.log("Inside evaluate, extractedFields:", JSON.stringify(extractedFields, null, 2));
+                for (const field of extractedFields) {
+                    for (const item of field.items) {
+                        const fieldName = item.value;
+                        const value = dataToSend[fieldName];
+                        if (value) {
+                            const inputElements = document.querySelectorAll(`input[name="${fieldName}"], textarea[name="${fieldName}"], select[name="${fieldName}"]`);
+                            for (const inputElement of inputElements) {
+                                if (inputElement.type === 'radio' || inputElement.type === 'checkbox') {
+                                    if (inputElement.value === value) {
+                                        inputElement.checked = true;
+                                    }
+                                } else if (inputElement.tagName === 'SELECT') {
+                                    for (const option of inputElement.options) {
+                                        if (option.value === value) {
+                                            option.selected = true;
+                                        }
+                                    }
+                                } else {
+                                    // For other input types, simply set the value
+                                    inputElement.value = value;
+                                }
+                            }
+                        }
+                    }
+                }
+            }, dataToSend, extractedFieldsString);
+
+            const confirmButton = await page.$('button[name="submitConfirm"]');
+            if (confirmButton) {
+                await confirmButton.click();
+                await page.waitForNavigation({ timeout: 30000 });
+            }
+
+            const submitButton = await page.$('button[name="subBtn"]');
+            if (submitButton) {
+                await Promise.all([
+                    page.waitForNavigation({ timeout: 30000 }),
+                    submitButton.click(),
+                ]);
+            }
+            await page.waitForSelector('h3.title', { timeout: 30000 });
+        } catch (error) {
+            console.error("エラーが発生しました:", error);
+        }
     }
 
-    await browser.close();
+    //await browser.close();
 }
 
 run().catch(console.error);
