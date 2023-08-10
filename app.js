@@ -228,22 +228,37 @@ async function run() {
                 // 3秒から5秒のランダムな待機時間を追加
                 const milliseconds = Math.floor(Math.random() * 2000) + 3000;
                 await new Promise(r => setTimeout(r, milliseconds));
+            }
 
-              }
-              
-              // 送信ボタンをクリック
-              await page.click(formData.submit);
+            // フォームの入力が完了した後、送信ボタンをクリックする前にスクリーンショットを撮る
+                // ページの全体の高さと幅を取得
+            const bodyHandle = await page.$('body');
+            const { width, height } = await bodyHandle.boundingBox();
+            await bodyHandle.dispose();
 
-              const buttons = await page.$$('button, input[type="submit"]'); // button要素とinput type="submit"要素を取得
-              for (const button of buttons) {
-                  const buttonText = await page.evaluate(el => el.textContent || el.value, button); // ボタンのテキスト内容またはvalue属性を取得
-                  console.log(buttonText); // テキスト内容をログに出力
-                  if (buttonText.includes('送信') || buttonText.includes('内容') || buttonText.includes('確認')) {
-                      await button.click();
-                      break; // 最初に見つかったボタンをクリックした後、ループを抜ける
-                  }               
-              }              
+            // viewportをページ全体のサイズに設定
+            await page.setViewport({ width: Math.ceil(width), height: Math.ceil(height) });
 
+            // スクリーンショットを撮る
+            const domainName = new URL(url).hostname; // URLからドメイン名を取得
+            const dateTime = new Date().toISOString().replace(/[:\-]/g, ''); // 現在の日時を取得
+            const screenshotPath = `/Users/nishishimamotoshu/Desktop/screenshot/${domainName}_${dateTime}.png`; // 保存先のパスを組み立てる
+
+            await page.screenshot({ path: screenshotPath, fullPage: true }); // スクリーンショットを撮る
+
+            // viewportを元に戻す（必要に応じて）
+            await page.setViewport({ width: 800, height: 600 });
+            await page.click(formData.submit);
+
+            const buttons = await page.$$('button, input[type="submit"]'); // button要素とinput type="submit"要素を取得
+            for (const button of buttons) {
+                const buttonText = await page.evaluate(el => el.textContent || el.value, button); // ボタンのテキスト内容またはvalue属性を取得
+                console.log(buttonText); // テキスト内容をログに出力
+                if (buttonText.includes('送信') || buttonText.includes('内容') || buttonText.includes('確認')) {
+                    await button.click();
+                    break; // 最初に見つかったボタンをクリックした後、ループを抜ける
+                }               
+            }
         } catch (error) {
             console.error("エラーが発生しました:", error);
         }
