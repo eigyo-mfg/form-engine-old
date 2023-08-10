@@ -131,26 +131,44 @@ async function run() {
         try {
             longestFormHTML = $.html().replace(/\n/g, '').replace(/>\s+</g, '><');
             console.log(longestFormHTML);
+            //送信したい内容
             const dataToSend = {
-                company: "営業製作所株式会社",
-                name: "西島本　周",
-                kanjiFirstname:"西島本",
-                kanjiLastname:"周",
-                huriFirstname: "にししまもと",
-                huriLastname: "しゅう",
-                email: "nishishimamoto@sales-bank.com",
-                phone: "080-4024-7677",
-                postCode: "550-0002",
-                address: "大阪府大阪市西区江戸堀1-22-38　三洋ビル501",
-                contenttype: "テスト",
-                sendtype: "メール",
-                otherContents: "テスト"
+                企業名: "営業製作所株式会社",
+                氏名: "安田　美佳",
+                漢字性:"安田",
+                漢字名:"美佳",
+                ふりがな性: "やすだ",
+                ふりがな名: "みか",
+                メール: "nishishimamoto@sales-bank.com",
+                電話: "06-6136-8027",
+                郵便番号: "550-0002",
+                住所: "大阪府大阪市西区江戸堀1-22-38　三洋ビル501",
+                返信方法: "メール",
+                問い合わせ分類: "サービスについて",
+                問い合わせ内容:
+                "テストです。\n安田です。\n美佳です。\n二人合わせて安田美佳です。"
             };
 
-            const promptContent = `HTMLを解析して、以下のデータを入力するためのJavaScriptコードを生成してください。また、送信ボタンのセレクタを特定してください。:
+            //GPT-4のAPIを活用し、フィールドを作成
+            const promptContent = `HTMLを解析して、以下のデータを入力するための情報を生成してください。
+            以下のデータを使用して、各フィールドに対応する値を特定してください。
             ${JSON.stringify(dataToSend, null, 2)}
+            この情報は、特定のjsonフォーマットで提供してください：
+            {
+              "fields": [
+                // text, email, textareaなどのフィールド：{"name": "dataToSendの対応するキー名", "value": "HTMLの対応する属性名", "type": "input_type_here"}
+                // radioやselectなどのフィールド：{"name": "dataToSendの対応するキー名", "value": "HTMLの対応する属性名", "type": "input_type_here", "selectedValue": "選択する値"}
+              ],
+              "submit": "送信ボタンのセレクタ" // 例：button[name="submitName"]
+            }
+            必ず【全て】のtext, textarea, selectを推論して埋めてください。
+            radioやcheckboxは特定の値を全て選択してください。
+            また、送信ボタンのセレクタを特定してください。
+            dataToSendの内容は多めに用意しているので全て使用しなくていいです。
+            問い合わせ内容はtextareaの可能性が高いです。
             解析するHTMLは以下の通りです: ${longestFormHTML}`;
-
+            
+            
             const completion = await openai.createChatCompletion({
                 model: "gpt-4",
                 messages: [
@@ -159,38 +177,78 @@ async function run() {
                 ],
             });
 
+            // GPT-4からのレスポンス
             const responseContent = completion.data.choices[0].message.content;
             console.log(responseContent);
-            const fillFormCode = responseContent.match(/```javascript\s+([^`]+)```/)[1];
-            const submitButtonSelector = "button[name='submitConfirm']"; // 送信ボタンのセレクタ
-        
-            page.on('console', msg => console.log('PAGE LOG:', msg.text()));
-            await page.evaluate(fillFormCode);
-        
-            // 送信ボタンをクリック
-            const submitButton = await page.$(submitButtonSelector);
-            if (submitButton) {
-                await Promise.all([
-                    page.waitForNavigation({ timeout: 30000 }),
-                    submitButton.click(),
-                ]);
-            }
-        
+
+            // 最初の波括弧 '{' のインデックスを取得
+            const startIndex = responseContent.indexOf('{');
             
-            const buttons = await page.$$('button'); // すべてのボタン要素を取得
-            for (const button of buttons) {
-                const buttonText = await page.evaluate(button => button.textContent, button);
-                if (buttonText.includes('送信') || buttonText.includes('内容') || buttonText.includes('確認')) {
-                    await button.click();
-                    break; // 最初に見つかったボタンをクリックした後、ループを抜ける
-                }               
-            }
+            // 最後の波括弧 '}' のインデックスを取得
+            const endIndex = responseContent.lastIndexOf('}');
+            
+            // 開始インデックスと終了インデックスを使用してJSON文字列を抽出
+            const jsonStr = responseContent.substring(startIndex, endIndex + 1);
+            
+            // JSON文字列をパース
+            const formData = JSON.parse(jsonStr);
+            
+            console.log(formData); // ここでformDataには必要な部分がJavaScriptオブジェクトとして格納されています
+            
+            for (const field of formData.fields) {
+                const valueToSend = dataToSend[field.name]; // 対応する値を取得
+                switch (field.type) {
+                  case 'text':
+                  case 'email':
+                  case 'date':
+                  case 'month':
+                  case 'number':
+                  case 'tel':
+                  case 'time':
+                  case 'url':
+                  case 'week':
+                    await page.type(`input[name="${field.value}"]`, valueToSend); // 値を入力
+                    break;
+                  case 'radio':
+                    await page.click(`input[name="${field.value}"][value="${field.selectedValue}"]`); // ラジオボタンを選択
+                    break;
+                  case 'checkbox':
+                    if (field.selectedValue) { // チェックボックスが選択されている場合
+                      await page.click(`input[name="${field.value}"]`);
+                    }
+                    break;
+                  case 'select':
+                    await page.select(`select[name="${field.value}"]`, field.selectedValue); // セレクトボックスを選択
+                    break;
+                  case 'textarea':
+                    await page.type(`textarea[name="${field.value}"]`, valueToSend); // テキストエリアに値を入力
+                    break;
+                  // 他のタイプに対応する場合、ここに追加のケースを追加します
+                }
+                // 3秒から5秒のランダムな待機時間を追加
+                const milliseconds = Math.floor(Math.random() * 2000) + 3000;
+                await new Promise(r => setTimeout(r, milliseconds));
+
+              }
+              
+              // 送信ボタンをクリック
+              await page.click(formData.submit);
+
+              const buttons = await page.$$('button, input[type="submit"]'); // button要素とinput type="submit"要素を取得
+              for (const button of buttons) {
+                  const buttonText = await page.evaluate(el => el.textContent || el.value, button); // ボタンのテキスト内容またはvalue属性を取得
+                  console.log(buttonText); // テキスト内容をログに出力
+                  if (buttonText.includes('送信') || buttonText.includes('内容') || buttonText.includes('確認')) {
+                      await button.click();
+                      break; // 最初に見つかったボタンをクリックした後、ループを抜ける
+                  }               
+              }              
 
         } catch (error) {
             console.error("エラーが発生しました:", error);
         }
     }
-    //await browser.close();
+    // await browser.close();
 }
 
 run().catch(console.error);
