@@ -51,8 +51,8 @@ async function run() {
                     await processOnComplete(page);
                     break;
                 case 'ERROR':
-                    await processOnError(page);
-                    break;
+                    state = await processOnError(page); // エラー処理後に状態を更新
+                    continue; // 次の繰り返しに直ちに進む
             }
     
             state = await currentState(page);
@@ -261,20 +261,8 @@ async function run() {
                     }
 
                     // フォームの入力が完了した後、送信ボタンをクリックする前にスクリーンショットを撮る
-                        // ページの全体の高さと幅を取得
-                    const bodyHandle = await page.$('body');
-                    const { width, height } = await bodyHandle.boundingBox();
-                    await bodyHandle.dispose();
-
-                    // viewportをページ全体のサイズに設定
-                    await page.setViewport({ width: Math.ceil(width), height: Math.ceil(height) });
-
-                    // スクリーンショットを撮る
-                    const domainName = new URL(url).hostname; // URLからドメイン名を取得
-                    const dateTime = new Date().toISOString().replace(/[:\-]/g, ''); // 現在の日時を取得
-                    const screenshotPath = `/Users/nishishimamotoshu/Desktop/screenshot/${domainName}_${dateTime}.png`; // 保存先のパスを組み立てる
-
-                    await page.screenshot({ path: screenshotPath, fullPage: true }); // スクリーンショットを撮る
+                    //スクリーンショットを撮る
+                    await takeScreenshot(page, 'input');
 
                     // viewportを元に戻す（必要に応じて）
                     await page.setViewport({ width: 800, height: 600 });
@@ -338,13 +326,16 @@ async function run() {
             // 予期しない応答があればデフォルト状態を返す
             return 'UNKNOWN';
         }
+ 
 
         async function processOnConfirm(page) {
             const buttons = await page.$$('button, input[type="submit"]'); // button要素とinput type="submit"要素を取得
             for (const button of buttons) {
                 const buttonText = await page.evaluate(el => el.textContent || el.value, button); // ボタンのテキスト内容またはvalue属性を取得
-                console.log('Button text:', buttonText); // テキスト内容をログに出力
                 if (buttonText.includes('送信') || buttonText.includes('内容') || buttonText.includes('確認')) {
+                    //スクリーンショット撮る
+                    await takeScreenshot(page, 'confirm');
+                    
                     console.log('Clicking the button:', buttonText);
                     const navigationPromise = page.waitForNavigation({ timeout: 10000 });
                     await button.click();
@@ -352,25 +343,27 @@ async function run() {
                     break; // 最初に見つかったボタンをクリックした後、ループを抜ける
                 }
             }
-        }        
+        }
+        async function processOnError(page) {
+            console.log("An error state has been detected!");        
+            // スクリーンショットを撮る
+            await takeScreenshot(page, 'error');
+        
+            return 'INPUT';
+        }
 
-        async function processOnComplete(page) {
-            console.log("Form submission has been completed successfully!");
-            // ページの全体の高さと幅を取得
+        async function takeScreenshot(page, stage = '') {
             const bodyHandle = await page.$('body');
             const { width, height } = await bodyHandle.boundingBox();
             await bodyHandle.dispose();
-
-            // viewportをページ全体のサイズに設定
-            await page.setViewport({ width: Math.ceil(width), height: Math.ceil(height) });
-
-            // スクリーンショットを撮る
-            const domainName = new URL(url).hostname; // URLからドメイン名を取得
-            const dateTime = new Date().toISOString().replace(/[:\-]/g, ''); // 現在の日時を取得
-            const screenshotPath = `/Users/nishishimamotoshu/Desktop/screenshot/${domainName}_${dateTime}_fin.png`; // 保存先のパスを組み立てる
-
-            await page.screenshot({ path: screenshotPath, fullPage: true }); // スクリーンショットを撮る
         
+            await page.setViewport({ width: Math.ceil(width), height: Math.ceil(height) });
+        
+            const domainName = new URL(page.url()).hostname;
+            const dateTime = new Date().toISOString().replace(/[:\-]/g, '');
+            const screenshotPath = `/Users/nishishimamotoshu/Desktop/screenshot/${domainName}_${dateTime}_${stage}.png`;
+        
+            await page.screenshot({ path: screenshotPath, fullPage: true });
         }
     }
     await browser.close();                          
