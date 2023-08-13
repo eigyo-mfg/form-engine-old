@@ -176,35 +176,38 @@ async function run() {
             };
 
             async function mapFieldToData(fields, dataToSend) {
-                // GPT-4に投げるクエリを構築
                 const fieldsJsonString = JSON.stringify({ fields: fields }, null, 2);
-                const promptContent = `以下のフィールド名を解析して、対応するデータを"dataToSend"のキーから選択してください:
-                ${fieldsJsonString}
-                ${JSON.stringify(dataToSend, null, 2)}
-                以下のフォーマットでJSONオブジェクトを構築してください:
-                {
-                "fields": [
-                    // text, email, textareaなどのフィールド：{"name": "dataToSendの対応するキー名", "value": "fieldsの属性名", "type": "fieldsのtype"}
-                    // radioやselectなどのフィールド：{"name": "dataToSendの対応するキー名", "value": "fieldsの属性名, "type": "fieldsのtype", "selectedValue": "選択する値"}
-                ],
-                "submit": "送信ボタンのセレクタ" // 例：button[name="submitName"]
-                }
-                必ず全てのフィールドを推論して埋めてください。
-                valueとtypeは元のフィールドを維持してください。
-                必ず【全て】のtext, textarea, selectを推論して埋めてください。
-                radioやcheckboxは特定の値を全て選択してください。
-                また、送信ボタンのセレクタを特定してください。
-                dataToSendの内容は多めに用意しているので全て使用しなくていいです。
-                問い合わせ内容はtextareaのフィールドとして解析する可能性が高いです。`;
-                console.log("Prompt Content:", promptContent); 
-
+                const promptContent = `
+                    以下のフィールドとデータを解析し、フィールド名とデータの対応関係を構築してください。
+                    解析対象のフィールド情報:
+                    ${fieldsJsonString}
+                    解析対象のデータ:
+                    ${JSON.stringify(dataToSend, null, 2)}
+            
+                    解析結果を以下のJSONフォーマットで提供してください:
+                    {
+                        "fields": [
+                            // text, email, textareaのフィールド：{"name": "dataToSendのキー名", "value": "フィールド属性名", "type": "フィールドのtype"}
+                            // radio, selectのフィールド：{"name": "dataToSendのキー名", "value": "フィールド属性名", "type": "フィールドのtype", "selectedValue": "選択値"}
+                        ],
+                        "submit": "送信ボタンのセレクタ" // 例：button[name="submitName"]
+                    }
+            
+                    全てのtext, email, textareaフィールドを正確にマッピングしてください。
+                    radioやcheckboxは与えられた情報に基づいて選択値を指定してください。
+                    送信ボタンのセレクタも正確に特定してください。
+                    問い合わせ内容はtextareaのフィールドとして解析する可能性が高いです。
+                    dataToSendの内容は全て使用しなくても構いません。
+                `;
+                console.log("Prompt Content:", promptContent);
+            
                 const completion = await openai.createChatCompletion({
                     model: "gpt-4",
                     messages: [
                         {"role": "system", "content": "あなたは世界でも有数のエンジニアです。特にHTMLの解析を得意としております。"},
                         {"role": "user", "content": promptContent}
-                    ],
-                });
+                    ]
+                });            
                 const mappedName = completion.data.choices[0].message.content;
                 console.log("Mapped Name:", mappedName); 
                 return mappedName;
