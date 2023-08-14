@@ -160,51 +160,60 @@ async function run() {
 
             const dataToSend = {
                 企業名: "営業製作所株式会社",
-                氏名: "安田　美佳",
+                担当者名: "安田　美佳",
+                ふりがな担当者名: "やすだ　みか",
                 漢字性:"安田",
                 漢字名:"美佳",
                 ふりがな性: "やすだ",
                 ふりがな名: "みか",
-                メール: "nishishimamoto@sales-bank.com",
+                メール: "m.yasuda@sales-bank.com",
                 電話: "06-6136-8027",
                 郵便番号: "550-0002",
                 住所: "大阪府大阪市西区江戸堀1-22-38　三洋ビル501",
+                生年月日:"1992年4月14日",
                 返信方法: "メール",
                 問い合わせ分類: "サービスについて",
+                部署:"営業部",
+                役職:"主査",
+                件名:"【製造業7,000名の担当者から廃材回収のニーズを頂戴しております】",
                 問い合わせ内容:
-                "テストです。\n安田です。\n美佳です。\n二人合わせて安田美佳です。"
+                "代表者様 \nお世話になります。\n営業製作所の安田と申します。\n製造業の担当者7,000名から廃材回収に関するニーズを頂戴しております\n具体的なニーズの有無まで調査行い、ご紹介が可能ですのでご連絡させていただきました。\n弊社は、製造業に特化した事業を展開しており、 サービスリリース2年で500社の企業様にご活用いただいております。\n貴社の回収しやすい【材質】【大きさ】【形状】【重量】を満たす、取引先を発掘することが可能です。 \n同業他社での実績や貴社に合致したレポートをご用意しておりますので、ご興味をお持ち頂ける場合はお電話にて詳細をお伝えします。\n 下記メールアドレスにお電話可能な日時をお送りくださいませ。\n ■メールアドレス m.yasuda@sales-bank.com \n■弊社パンフレット https://tinyurl.com/239r55dc \nそれではご連絡お待ちしております。"
             };
 
             async function mapFieldToData(fields, dataToSend) {
                 const fieldsJsonString = JSON.stringify({ fields: fields }, null, 2);
                 const promptContent = `
-                    以下のフィールドとデータを解析し、フィールド名とデータの対応関係を構築してください。
-                    解析対象のフィールド情報:
-                    ${fieldsJsonString}
-                    解析対象のデータ:
-                    ${JSON.stringify(dataToSend, null, 2)}
-            
-                    解析結果を以下のJSONフォーマットで提供してください:
-                    {
-                        "fields": [
-                            // text, email, textareaのフィールド：{"name": "dataToSendのキー名", "value": "フィールド属性名", "type": "フィールドのtype"}
-                            // radio, selectのフィールド：{"name": "dataToSendのキー名", "value": "フィールド属性名", "type": "フィールドのtype", "selectedValue": "選択値"}
-                        ],
-                        "submit": "送信ボタンのセレクタ" // 例：button[name="submitName"]
-                    }
-            
-                    全てのtext, email, textareaフィールドを正確にマッピングしてください。
-                    radioやcheckboxは与えられた情報に基づいて選択値を指定してください。
-                    送信ボタンのセレクタも正確に特定してください。
-                    問い合わせ内容はtextareaのフィールドとして解析する可能性が高いです。
-                    dataToSendの内容は全て使用しなくても構いません。
+                Analyze the following fields and data, and map the field names with the corresponding data. If a field has multiple "selectedValue" options, choose the one that corresponds to the key in the "dataToSend". If a perfect match is not found, choose a default value to ensure submission.
+
+                Fields to analyze:
+                ${fieldsJsonString}
+                
+                Data to analyze:
+                ${JSON.stringify(dataToSend, null, 2)}
+                
+                Provide the analysis result in the following JSON format:
+                {
+                    "fields": [
+                        // For text, email, textarea fields: {"name": "dataToSend's key", "value": "field attribute name", "type": "field's type"}
+                        // For radio, select fields: {"name": "dataToSend's key", "value": "field attribute name", "type": "field's type", "selectedValue": "chosen value"}
+                    ],
+                    "submit": "submit button's selector" // e.g., button[name="submitName"]
+                }
+                
+                Map all text, email, textarea fields accurately.
+                For radio or checkbox or select, specify the selected value based on the given information.
+                Identify the submit button's selector precisely.
+                Inquiry content is likely to be analyzed as a textarea field.
+                Not all content in dataToSend needs to be used.
                 `;
+                
+            
                 console.log("Prompt Content:", promptContent);
             
                 const completion = await openai.createChatCompletion({
                     model: "gpt-4",
                     messages: [
-                        {"role": "system", "content": "あなたは世界でも有数のエンジニアです。特にHTMLの解析を得意としております。"},
+                        {"role": "system", "content": "You are one of the world's leading engineers, specializing in HTML analysis."},
                         {"role": "user", "content": promptContent}
                     ]
                 });            
