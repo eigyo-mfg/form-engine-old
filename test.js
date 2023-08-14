@@ -10,7 +10,7 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 // 対象のURLの定義
-const url = 'https://www.arduc.co.jp/wp/contact';
+const url = 'https://estem-web.com/contact.html';
 
 // メインの非同期関数の定義
 async function run() {
@@ -121,18 +121,28 @@ async function run() {
             const parseField = (el, type) => {
                 const name = $(el).attr('name') || $(el).attr('id') || $(el).attr('class');
                 const value = name;
+                // ①labelとinput等が親子関係になく、forとidで関連付けの場合
+                let label = $(`label[for="${name}"]`).text() || $(`label[for="${$(el).attr('id')}"]`).text() || '';
+                // ②labelとinput等が親子関係の場合
+                if (label === '') {
+                    label = $(el).parent('label').text() || '';
+                }
             
                 if (type === "radio" || type === "checkbox") {
                     const existingField = fields.find(field => field.name === value && field.type === type);
                     if (existingField) {
-                        existingField.values.push({ value: $(el).attr('value') });
+                        existingField.values.push({ value: $(el).attr('value'), label: label });
                     } else {
-                        fields.push({ name: value, value: name, type: type, values: [{ value: $(el).attr('value') }] });
+                        fields.push({ name: value, value: name, type: type, values: [{ value: $(el).attr('value'), label: label }] });
                     }
                 } else {
-                    fields.push({ name: value, value: name, type: type });
+                    fields.push({ name: value, value: name, type: type, label: label });
                 }
             };
+            
+            // 以降のコードは変更なし
+            
+            
             
             // input fields
             $('input[type="text"], input[type="email"], input[type="date"], input[type="month"], input[type="number"], input[type="tel"], input[type="time"], input[type="url"], input[type="week"], textarea').each(function() {
@@ -183,58 +193,58 @@ async function run() {
                 "代表者様 \nお世話になります。\n営業製作所の安田と申します。\n製造業の担当者7,000名から廃材回収に関するニーズを頂戴しております\n具体的なニーズの有無まで調査行い、ご紹介が可能ですのでご連絡させていただきました。\n弊社は、製造業に特化した事業を展開しており、 サービスリリース2年で500社の企業様にご活用いただいております。\n貴社の回収しやすい【材質】【大きさ】【形状】【重量】を満たす、取引先を発掘することが可能です。 \n同業他社での実績や貴社に合致したレポートをご用意しておりますので、ご興味をお持ち頂ける場合はお電話にて詳細をお伝えします。\n 下記メールアドレスにお電話可能な日時をお送りくださいませ。\n ■メールアドレス m.yasuda@sales-bank.com \n■弊社パンフレット https://tinyurl.com/239r55dc \nそれではご連絡お待ちしております。"
             };
 
-            // async function mapFieldToData(fields, dataToSend) {
-            //     const fieldsJsonString = JSON.stringify({ fields: fields }, null, 2);
-            //     const promptContent = `
-            //     Analyze the following fields and data, and map the field names with the corresponding data. If a field has multiple "selectedValue" options, choose the one that corresponds to the key in the "dataToSend". If a perfect match is not found, choose a default value to ensure submission.
+            async function mapFieldToData(fields, dataToSend) {
+                const fieldsJsonString = JSON.stringify({ fields: fields }, null, 2);
+                const promptContent = `
+                Analyze the following fields and data, and map the field names with the corresponding data. If a field has multiple "selectedValue" options, choose the one that corresponds to the key in the "dataToSend". If a perfect match is not found, choose a default value to ensure submission.
 
-            //     Fields to analyze:
-            //     ${fieldsJsonString}
+                Fields to analyze:
+                ${fieldsJsonString}
                 
-            //     Data to analyze:
-            //     ${JSON.stringify(dataToSend, null, 2)}
+                Data to analyze:
+                ${JSON.stringify(dataToSend, null, 2)}
                 
-            //     Provide the analysis result in the following JSON format:
-            //     {
-            //         "fields": [
-            //             // For text, email, textarea fields: {"name": "dataToSend's key", "value": "field attribute name", "type": "field's type"}
-            //             // For radio, select fields: {"name": "dataToSend's key", "value": "field attribute name", "type": "field's type", "selectedValue": "chosen value"}
-            //         ],
-            //         "submit": "submit button's selector" // e.g., button[name="submitName"]
-            //     }
+                Provide the analysis result in the following JSON format:
+                {
+                    "fields": [
+                        // For text, email, textarea fields: {"name": "dataToSend's key", "value": "field attribute name", "type": "field's type"}
+                        // For radio, select fields: {"name": "dataToSend's key", "value": "field attribute name", "type": "field's type", "selectedValue": "chosen value"}
+                    ],
+                    "submit": "submit button's selector" // e.g., button[name="submitName"]
+                }
                 
-            //     Map all text, email, textarea fields accurately.
-            //     For radio or checkbox or select, specify the selected value based on the given information.
-            //     Identify the submit button's selector precisely.
-            //     Inquiry content is likely to be analyzed as a textarea field.
-            //     Not all content in dataToSend needs to be used.
-            //     `;
+                Map all text, email, textarea fields accurately.
+                For radio or checkbox or select, specify the selected value based on the given information.
+                Identify the submit button's selector precisely.
+                Inquiry content is likely to be analyzed as a textarea field.
+                Not all content in dataToSend needs to be used.
+                `;
                 
             
-            //     console.log("Prompt Content:", promptContent);
+                console.log("Prompt Content:", promptContent);
             
-            //     const completion = await openai.createChatCompletion({
-            //         model: "gpt-4",
-            //         messages: [
-            //             {"role": "system", "content": "You are one of the world's leading engineers, specializing in HTML analysis."},
-            //             {"role": "user", "content": promptContent}
-            //         ]
-            //     });            
-            //     const mappedName = completion.data.choices[0].message.content;
-            //     console.log("Mapped Name:", mappedName); 
-            //     return mappedName;
+                const completion = await openai.createChatCompletion({
+                    model: "gpt-4",
+                    messages: [
+                        {"role": "system", "content": "You are one of the world's leading engineers, specializing in HTML analysis."},
+                        {"role": "user", "content": promptContent}
+                    ]
+                });            
+                const mappedName = completion.data.choices[0].message.content;
+                console.log("Mapped Name:", mappedName); 
+                return mappedName;
 
-            // }
-            // async function processFields(fields, dataToSend) {
-            //     const mappedData = await mapFieldToData(fields, dataToSend); // 全フィールドの対応情報を取得
-            //     mappedData.fields.forEach((field, index) => {
-            //       fields[index].value = field.value; // フィールドのvalueを更新
-            //     });
-            //     return { fields: fields, submit: mappedData.submit };
-            // }
+            }
+            async function processFields(fields, dataToSend) {
+                const mappedData = await mapFieldToData(fields, dataToSend); // 全フィールドの対応情報を取得
+                mappedData.fields.forEach((field, index) => {
+                  fields[index].value = field.value; // フィールドのvalueを更新
+                });
+                return { fields: fields, submit: mappedData.submit };
+            }
               
-            // const updatedFields = await processFields({ fields: fields, submit: submit }, dataToSend);
-            // console.log(updatedFields);
+            const updatedFields = await processFields({ fields: fields, submit: submit }, dataToSend);
+            console.log(updatedFields);
             
             return {
                 fields: fields,
