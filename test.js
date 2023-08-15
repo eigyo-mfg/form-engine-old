@@ -10,7 +10,7 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 // 対象のURLの定義
-const url = 'https://www.arduc.co.jp/contact/';
+const url = 'https://www.pro-seeds.com/contact-point/contact/';
 
 // メインの非同期関数の定義
 async function run() {
@@ -198,29 +198,45 @@ async function run() {
             async function mapFieldToData(fields, dataToSend) {
                 const fieldsJsonString = JSON.stringify(fields);
                 const promptContent = `
-Fields to analyze:
+解析するフィールド::
 ${fieldsJsonString}
+・通常のフィールドの構成
+{"name": "フィールド名","value": "フィールドの属性名","type": “フィールドのタイプ”,"label": "対応するラベル"}
+
+・valuesが含まれるフィールドの構成
+{"name": "フィールド名","value": "フィールドの属性名","type": “フィールドのタイプ","values": [{“value": "複数の選択肢の値1","label": "対応するラベル")},{"value": "複数の選択肢2","label": "対応するラベル"},,,,,
 
 dataToSend to analyze:
 ${JSON.stringify(dataToSend, null, 2)}
+・dataToSendの構成
+dataToSendのキー:”dataToSendのキーの値”
 
-Analyze the above fields and data (dataToSend), and map the field names with the corresponding data. Select the field names for all text, email, date, month, number, tel, time, url, week, and textarea fields from the keys in dataToSend. The value and type attributes of the original field must remain intact.
+上記のフィールドとデータ（dataToSend）を解析し、フィールドとdataToSend内の対応するキーとの間にマッピングを作成してください。以下のように進めてください：
 
-Provide the analysis result in the following JSON format:
+1. text, email, date, month, number, tel, time, url, week, and textarea fieldsに関して:
+    - フィールド名、フィールドの属性名、フィールドのタイプ、ラベルに基づいてdataToSend内の最も近い一致するキーを該当のフィールド名に代入
+    - 元のフィールドの属性名とタイプ属性を必ずそのままにします
+
+2. radio, checkbox, or select fieldsに関して:
+    - 元のフィールド名、フィールドの属性名、フィールドのタイプは維持してください。
+    - dataToSendの値を参考にして、values内のvalueをの中から一つに選択してください。
+    - どれを選択していいかわからない場合は、提出を確実にするために、values内の最後valueを選択します。
+
+3. 送信ボタンのセレクターを正確に特定します。
+
+以下のJSON形式で解析結果を提供してください：
 {
     "fields": [
-        // For text, email, tel, url, and textarea fields: {"name": "key from dataToSend", "value": "field's value", "type": "field's type"}
-        // For radio, checkbox, or select fields: {"name": "key from dataToSend", "value": "field attribute name", "type": "field's type", "values": "chosen value"}
+        // For text, email, tel, url, and textarea fields: {"name": "dataToSendからの最も近い一致するキー", "value": "フィールドの属性名", "type": "フィールドのタイプ"}
+        // For radio, checkbox, or select fields: {"name": "dataToSendからの最も近い一致するキー", "value": "フィールド属性名", "type": "フィールドのタイプ", "values": "選択された値"}
     ],
     "submit": "submit button's selector" // e.g., button[name="submitName"]
 }
 
-If a field has multiple "values" options, choose the one that corresponds to the key in "dataToSend". If a perfect match is not found, choose the last value of the applicable values to ensure submission.
-
-For radio, checkbox, or select, specify the selected value based on the given information.
-Identify the submit button's selector precisely.
-The inquiry content is likely to be analyzed as a textarea field.
-It is not necessary to use all the content in dataToSend.
+Note:
+- dataToSendのすべての内容を使用する必要はありません。関連するものだけをマップしてください。
+- 命名規則に特定のルールやパターンが見られる場合、それを活用してインテリジェントなマッピングを作成してください。
+- 複数選択が可能なフィールドなど、関連するすべての値がマップされていることを確認してください。
 `;                         
             
                 console.log("Prompt Content:", promptContent);
