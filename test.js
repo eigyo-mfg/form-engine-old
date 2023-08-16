@@ -129,16 +129,18 @@ async function run() {
                 }
             
                 if (type === "radio" || type === "checkbox") {
+                    const selectValue = $(el).attr('value');
                     const existingField = fields.find(field => field.name === value && field.type === type);
                     if (existingField) {
-                        existingField.values.push({ value: $(el).attr('value'), label: label });
+                        existingField.values.push({ selectValue: selectValue, label: label }); // キー名を selectValue に変更
                     } else {
-                        fields.push({ name: value, value: name, type: type, values: [{ value: $(el).attr('value'), label: label }] });
+                        fields.push({ name: value, value: name, type: type, values: [{ selectValue: selectValue, label: label }] }); // キー名を selectValue に変更
                     }
                 } else {
                     fields.push({ name: value, value: name, type: type, label: label });
                 }
-            };            
+            };
+                              
             
             // input fields
             $('input[type="text"], input[type="email"], input[type="date"], input[type="month"], input[type="number"], input[type="tel"], input[type="time"], input[type="url"], input[type="week"], textarea').each(function() {
@@ -168,75 +170,79 @@ async function run() {
             console.log(JSON.stringify({ fields, submit }, null, 2));
                         
             const dataToSend = {
-企業名: "営業製作所株式会社",
-担当者名: "安田　美佳",
-ふりがな担当者名: "やすだ　みか",
-漢字性:"安田",
-漢字名:"美佳",
-ふりがな性: "やすだ",
-ふりがな名: "みか",
-メール: "m.yasuda@sales-bank.com",
-電話: "06-6136-8027",
-電話上:"06",
-電話中:"6136",
-電話下:"8027",
-郵便番号: "550-0002",
-郵便番号上:"550",
-郵便番号下:"0002",
-住所: "大阪府大阪市西区江戸堀1-22-38　三洋ビル501",
-生年月日:"1992年4月14日",
-返信方法: "メール",
-問い合わせ分類: "サービスについて",
-部署:"営業部",
-役職:"主査",
-件名:"【製造業7,000名の担当者から廃材回収のニーズを頂戴しております】",
-問い合わせ内容:
+"company_name": "営業製作所株式会社",
+"contact_person": "安田　美佳",
+"contact_person_kana": "やすだ　みか",
+"last_name_kanji": "安田",
+"first_name_kanji": "美佳",
+"last_name_kana": "やすだ",
+"first_name_kana": "みか",
+"email": "m.yasuda@sales-bank.com",
+"phone": "06-6136-8027",
+"phone_area_code": "06",
+"phone_prefix": "6136",
+"phone_line_number": "8027",
+"postal_code": "550-0002",
+"postal_code_prefix": "550",
+"postal_code_suffix": "0002",
+"address": "大阪府大阪市西区江戸堀1-22-38　三洋ビル501",
+"date_of_birth": "1992年4月14日",
+"reply_method": "メール",
+"department": "営業部",
+"position": "主査",
+"subject": "【製造業7,000名の担当者から廃材回収のニーズを頂戴しております】",
+"inquiry_content": 
 "代表者様 \nお世話になります。\n営業製作所の安田と申します。\n製造業の担当者7,000名から廃材回収に関するニーズを頂戴しております\n具体的なニーズの有無まで調査行い、ご紹介が可能ですのでご連絡させていただきました。\n弊社は、製造業に特化した事業を展開しており、 サービスリリース2年で500社の企業様にご活用いただいております。\n貴社の回収しやすい【材質】【大きさ】【形状】【重量】を満たす、取引先を発掘することが可能です。 \n同業他社での実績や貴社に合致したレポートをご用意しておりますので、ご興味をお持ち頂ける場合はお電話にて詳細をお伝えします。\n 下記メールアドレスにお電話可能な日時をお送りくださいませ。\n ■メールアドレス m.yasuda@sales-bank.com \n■弊社パンフレット https://tinyurl.com/239r55dc \nそれではご連絡お待ちしております。"
             };
-            dataToSend.問い合わせ内容 = dataToSend.問い合わせ内容.substring(0, 20);
+            dataToSend.inquiry_content = dataToSend.inquiry_content.substring(0, 20);
 
             async function mapFieldToData(fields, dataToSend) {
                 const fieldsJsonString = JSON.stringify(fields);
                 const promptContent = `
-解析するフィールド::
+Analyze the following fields:
 ${fieldsJsonString}
-・通常のフィールドの構成
-{"name": "フィールド名","value": "フィールドの属性名","type": “フィールドのタイプ”,"label": "対応するラベル"}
+・Standard field configuration:
+{"name": "Field name","value": "Field attribute name","type": "Field type","label": "Corresponding label"}
 
-・valuesが含まれるフィールドの構成
-{"name": "フィールド名","value": "フィールドの属性名","type": “フィールドのタイプ","values": [{“value": "複数の選択肢の値1","label": "対応するラベル")},{"value": "複数の選択肢2","label": "対応するラベル"},,,,,
+・Configuration for fields containing 'values':
+{"name": "Field name","value": "Field attribute name","type": "Field type","values": [{"selectValue": "Multiple choice value1","label": "Corresponding label"},{"selectValue"": "Multiple choice value2","label": "Corresponding label"},,,,,
 
 dataToSend to analyze:
 ${JSON.stringify(dataToSend, null, 2)}
-・dataToSendの構成
-dataToSendのキー:”dataToSendのキーの値”
+・dataToSend configuration:
+dataToSend key: "Value of dataToSend key"
 
-上記のフィールドとデータ（dataToSend）を解析し、フィールドとdataToSend内の対応するキーとの間にマッピングを作成してください。以下のように進めてください：
+I'm trying to send a sales email from the inquiry form.
+Based on the JSON format received from you, send it with javascript.
+Analyze the above fields and data (dataToSend), and create a mapping between the fields and the corresponding keys in dataToSend. Here's how you should approach this:
 
-1. text, email, date, month, number, tel, time, url, week, and textarea fieldsに関して:
-    - フィールド名、フィールドの属性名、フィールドのタイプ、ラベルに基づいてdataToSend内の最も近い一致するキーを該当のフィールド名に代入
-    - 元のフィールドの属性名とタイプ属性を必ずそのままにします
+1. For text, email, date, month, number, tel, time, url, week, and textarea fields:
+    - You must identify the closest matching key in dataToSend based on the field name, attribute name, type, and label.
+    - You must keep the original "Field attribute name","Field type".
+    - "inquiry_content" is likely to be analyzed as a textarea field.
 
-2. radio, checkbox, or select fieldsに関して:
-    - 元のフィールド名、フィールドの属性名、フィールドのタイプは維持してください。
-    - dataToSendの値を参考にして、values内のvalueをの中から一つに選択してください。
-    - どれを選択していいかわからない場合は、提出を確実にするために、values内の最後valueを選択します。
+2. Only For radio, checkbox, or select fields:
+    - You must not change the original "Field name","Field attribute name","Field type".
+    - The only part that must be changed is "selectValue".
+    - If "values" are present in the field, then absolutely one of the "selectedValue" must be selected.
+    - For "selectValue", consider the contents of "label" and "dataToSend", and select it as an inquiry for sales purposes without hindrance.
+    - If you are unsure which to select, you must choose the last selectValue" within values to ensure submission.
 
-3. 送信ボタンのセレクターを正確に特定します。
+3. Precisely identify the submit button's selector.
 
-以下のJSON形式で解析結果を提供してください：
+You must provide the analysis result in the following JSON format:
 {
     "fields": [
-        // For text, email, tel, url, and textarea fields: {"name": "dataToSendからの最も近い一致するキー", "value": "フィールドの属性名", "type": "フィールドのタイプ"}
-        // For radio, checkbox, or select fields: {"name": "dataToSendからの最も近い一致するキー", "value": "フィールド属性名", "type": "フィールドのタイプ", "values": "選択された値"}
+        // For text, email, tel, url, and textarea fields: {"name": "Closest matching key from dataToSend", "value": "Field attribute name", "type": "Field's type"}
+        // For radio, checkbox, or select fields: {"name": "Field attribute name", "value": "Field attribute name", "type": "Field's type", "values": "Selected value(s)"}
     ],
     "submit": "submit button's selector" // e.g., button[name="submitName"]
 }
 
 Note:
-- dataToSendのすべての内容を使用する必要はありません。関連するものだけをマップしてください。
-- 命名規則に特定のルールやパターンが見られる場合、それを活用してインテリジェントなマッピングを作成してください。
-- 複数選択が可能なフィールドなど、関連するすべての値がマップされていることを確認してください。
+- You must not change the original "Field attribute name","Field type".
+- The following fields is in Japanese.
+- It is not necessary to use all the content in dataToSend, you must only map what's relevant.
 `;                         
             
                 console.log("Prompt Content:", promptContent);
