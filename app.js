@@ -12,7 +12,7 @@ const maxProcessOnInputTrials = 2;
 const maxTotalTrials = 3;
 
 // 対象のURLの定義
-const url = 'https://sales-bank.com/contact/';
+const url = 'http://salesbank.xsrv.jp/googleform.html';
 
 // メインの非同期関数の定義
 async function run() {
@@ -199,7 +199,8 @@ async function run() {
                 
                 // submit button
                 const submitButtonName = $('button[type="submit"], input[type="submit"]').attr('name');
-                const submit = submitButtonName ? `button[name="${submitButtonName}"]` : 'button[type="submit"]';                
+                const submitType = submitButtonName ? ($('input[name="' + submitButtonName + '"]').length > 0 ? 'input' : 'button') : 'button';
+                const submit = submitButtonName ? `${submitType}[name="${submitButtonName}"]` : 'button[type="submit"]';                            
                 console.log(JSON.stringify({ fields, submit }, null, 2));
                             
                 const dataToSend = {
@@ -378,7 +379,7 @@ Note:
             }
         }
 
-        async function currentState(page) {
+        async function currentState(page, formData) {
             // HTMLテキスト情報を取得
             await page.waitForSelector('body', { timeout: 30000 }); // タイムアウトを30秒に設定
             const bodyHandle = await page.$('body');
@@ -387,51 +388,57 @@ Note:
                 .replace(/\s+/g, ' ') // 連続する空白を一つの空白に置換
                 .replace(/\n+/g, ' ') // 改行を空白に置換
                 .trim(); // 文字列の先頭と末尾の空白を削除
-            console.log(cleanedHtmlTextContent )
+            console.log(cleanedHtmlTextContent)
             await bodyHandle.dispose();
         
             const currentPageUrl = page.url();
+            // テキストタイプのフィールドだけを抜き出してチェック
+            const textFields = formData.fields.filter(field => field.type === 'text').slice(0, 2); // 最初の2つのテキストフィールドを取得
+            const hasTextFields = await Promise.all(
+                textFields.map(field => page.$(`input[name="${field.value}"]`) !== null)
+            );
+            const isAllTextFieldsExist = hasTextFields.every(exist => exist);
+            const isAnyTextFieldHiddenOrReadonly = await Promise.all(
+                textFields.map(field => page.$eval(`input[name="${field.value}"]`, el => el.hidden || el.readOnly))
+            );
 
-                    // クエリのメッセージを定義
-            const messages = [
-                { "role": "system", "content": " あなたは世界でも有数のアシスタントです。特にHTMLの解析を得意としております。" },
-                { "role": "user", "content": `このbodyのテキスト内容とURL(${currentPageUrl})から、ページの位置を次の形式でjsonとして返してください。
-                "確認画面"の特徴としては、"確認","内容","最終"というキーワードやそれに近しい文字が入っている可能性が高い。
-                "完了"の特徴としては、"送信完了","ありがとうございます","送信されました"というキーワードやそれに近しい文字が入っている可能性が高い。
-                必ず下記フォーマットに従って返してください。
-                "入力画面","確認画面","完了","エラー"のいずれか一つを必ず選択してください。
-                    {
-                    "位置": "入力画面" または "確認画面" または "完了" または "エラー"
-                    }
-                    : bodyのテキスト内容は下記です。
-                    ${cleanedHtmlTextContent}` }
-            ];
+            const hasSubmitButton = await page.$(formData.submit) !== null;
         
-            // クエリを送信
-            const completion = await openai.createChatCompletion({
-                model: "gpt-3.5-turbo",
-                messages: messages,
-            });
+            // 条件に基づいて状態を判定
+            let currentState;
+            if (!isAllTextFieldsExist && hasSubmitButton) currentState = 'CONFIRM';
+            else if (isAllTextFieldsExist && isAnyTextFieldHiddenOrReadonly.some(val => val) && hasSubmitButton) currentState = 'CONFIRM';
+            else if (isAllTextFieldsExist && !isAnyTextFieldHiddenOrReadonly.some(val => val) && hasSubmitButton) currentState = 'INPUT';
+            else if (!isAllTextFieldsExist && !hasSubmitButton) {
+                const messages = [
+                    { "role": "system", "content": " あなたは世界でも有数のアシスタントです。特にHTMLの解析を得意としております。" },
+                    { "role": "user", "content": `このbodyのテキスト内容とURL(${currentPageUrl})から、ページの位置を次の形式でjsonとして返してください。選択肢は、"完了"か、"エラー"の二択です。必ずどちらかを選択してください。"完了"の特徴としては、"送信完了","ありがとうございます","送信されました"というキーワードやそれに近しい文字が入っている可能性が高い。"エラー"の特徴としては、"エラー","必須項目が未入力です"というキーワードやそれに近しいこ言葉が入っている可能性が高い。必ず下記フォーマットで返してください。{ "位置": "完了" または "エラー" }: bodyのテキスト内容は下記です。${cleanedHtmlTextContent}` }
+                ];
         
-            // 応答に基づいて状態を返す
-            const responseMessage = completion.data.choices[0].message;
-            console.log("Response message type:", typeof responseMessage);
-            console.log("Response message content:", responseMessage);
-            const responseContentString = responseMessage.content.match(/\{[^\}]+\}/)[0];
-            const responseContent = JSON.parse(responseContentString);
-            const currentState = responseContent["位置"];
-            console.log('Detected state:', currentState);            
+                // クエリを送信
+                const completion = await openai.createChatCompletion({
+                    model: "gpt-3.5-turbo",
+                    messages: messages,
+                });
         
-            if (currentState === '入力画面') return 'INPUT';
-            if (currentState === '確認画面') return 'CONFIRM';
-            if (currentState === '完了') return 'COMPLETE';
-            if (currentState === 'エラー') return 'ERROR';
-        
-            // 予期しない応答があればデフォルト状態を返す
-            return 'UNKNOWN';
+                // 応答に基づいて状態を返す
+                const responseMessage = completion.data.choices[0].message;
+                console.log("Response message type:", typeof responseMessage);
+                console.log("Response message content:", responseMessage);
+                const responseContentString = responseMessage.content.match(/\{[^\}]+\}/)[0];
+                const responseContent = JSON.parse(responseContentString);
+                currentState = responseContent["位置"];
+                console.log('Detected state:', currentState);
+                if (currentState === '完了') return 'COMPLETE';
+                if (currentState === 'エラー') return 'ERROR';
+            } else {
+                // 予期しない応答があればデフォルト状態を返す
+                currentState = 'UNKNOWN';
+            }
+            console.log('Detected state:', currentState);
+            return currentState;
         }
- 
-
+        
         async function processOnConfirm(page) {
             const buttons = await page.$$('button, input[type="submit"]'); // button要素とinput type="submit"要素を取得
             for (const button of buttons) {
@@ -448,6 +455,7 @@ Note:
                 }
             }
         }
+
         async function processOnError(page) {
             console.log("An error state has been detected!");        
             // スクリーンショットを撮る
