@@ -154,7 +154,7 @@ async function run() {
             
             // select fields
             $('select').each(function() {
-                const name = $(this).attr('name') || $(this).attr('id') || $(this).attr('class');
+                const name = $(this).attr('name') || $(this).attr('jsname')|| $(this).attr('id') || $(this).attr('class');
                 const value = name;
                 const type = 'select';
                 const values = [];

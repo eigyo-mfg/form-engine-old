@@ -12,7 +12,7 @@ const maxProcessOnInputTrials = 2;
 const maxTotalTrials = 3;
 
 // 対象のURLの定義
-const url = 'http://salesbank.xsrv.jp/googleform.html';
+const url = 'https://sales-bank.com/contact/';
 
 // メインの非同期関数の定義
 async function run() {
@@ -40,12 +40,13 @@ async function run() {
         let state = 'INPUT';
         let processOnInputTrial = 0;
         let totalTrial = 0;
+        let formData; // formDataを保存するための変数
         while (state !== 'COMPLETE' && totalTrial < maxTotalTrials) {
             switch (state) {
                 case 'INPUT':
                     if (processOnInputTrial < maxProcessOnInputTrials) {
                         processOnInputTrial++;
-                        await processOnInput(page);
+                        formData = await processOnInput(page); // formDataを受け取る
                     } else {
                         console.log("Max processOnInput trials reached, skipping...");
                     }
@@ -61,7 +62,7 @@ async function run() {
                     continue; // 次の繰り返しに直ちに進む
             }
         
-            state = await currentState(page);
+            state = await currentState(page,formData); 
             totalTrial++;
             if (totalTrial >= maxTotalTrials) {
                 console.log("Max total trials reached, exiting...");
@@ -201,7 +202,6 @@ async function run() {
                 const submitButtonName = $('button[type="submit"], input[type="submit"]').attr('name');
                 const submitType = submitButtonName ? ($('input[name="' + submitButtonName + '"]').length > 0 ? 'input' : 'button') : 'button';
                 const submit = submitButtonName ? `${submitType}[name="${submitButtonName}"]` : 'button[type="submit"]';                            
-                console.log(JSON.stringify({ fields, submit }, null, 2));
                             
                 const dataToSend = {
 "company_name": "営業製作所株式会社",
@@ -281,7 +281,6 @@ Note:
 - It is not necessary to use all the content in dataToSend, you must only map what's relevant.
 `;                         
 
-                    console.log("Prompt Content:", promptContent);
                 
                     const completion = await openai.createChatCompletion({
                         model: "gpt-4",
@@ -292,7 +291,6 @@ Note:
                     });     
                     // GPT-4からのレスポンス       
                     const mappedName = completion.data.choices[0].message.content;
-                    console.log("Mapped Name:", mappedName); 
 
                     // 最初の波括弧 '{' のインデックスを取得
                     const startIndex = mappedName.indexOf('{');
@@ -305,8 +303,6 @@ Note:
 
                     // コメントを削除（//から始まる行を削除）
                     const jsonWithoutComments = jsonStr.replace(/\/\/.*$/gm, '');
-
-                    console.log("Extracted JSON String without comments:", jsonWithoutComments);
 
                     // JSON文字列をパース
                     const formData = JSON.parse(jsonWithoutComments);
@@ -363,7 +359,7 @@ Note:
                         // 他のタイプに対応する場合、ここに追加のケースを追加します
                         }
                             // 3秒から5秒のランダムな待機時間を追加
-                        const milliseconds = Math.floor(Math.random() * 2000) + 3000;
+                        const milliseconds = Math.floor(Math.random() * 500) + 1000;
                         await new Promise(r => setTimeout(r, milliseconds));
                         }
                     
@@ -373,13 +369,20 @@ Note:
 
                     // viewportを元に戻す（必要に応じて）
                     await page.setViewport({ width: 800, height: 600 });
-                    await new Promise(r => setTimeout(r, 5000));
+                    await new Promise(r => setTimeout(r, 1000));
                     await page.click(formData.submit);
+                    await currentState(page, formData);
+                    return formData;
                 }
             }
         }
 
-        async function currentState(page, formData) {
+        async function currentState(page,formData) {
+            console.log("formData in currentState:", formData); 
+            if (!formData || !formData.fields) {
+                console.error("formData or formData.fields is undefined in currentState function");
+                return;
+            }
             // HTMLテキスト情報を取得
             await page.waitForSelector('body', { timeout: 30000 }); // タイムアウトを30秒に設定
             const bodyHandle = await page.$('body');
@@ -388,21 +391,37 @@ Note:
                 .replace(/\s+/g, ' ') // 連続する空白を一つの空白に置換
                 .replace(/\n+/g, ' ') // 改行を空白に置換
                 .trim(); // 文字列の先頭と末尾の空白を削除
-            console.log(cleanedHtmlTextContent)
             await bodyHandle.dispose();
         
             const currentPageUrl = page.url();
             // テキストタイプのフィールドだけを抜き出してチェック
             const textFields = formData.fields.filter(field => field.type === 'text').slice(0, 2); // 最初の2つのテキストフィールドを取得
             const hasTextFields = await Promise.all(
-                textFields.map(field => page.$(`input[name="${field.value}"]`) !== null)
+                textFields.map(async field => {
+                    const selector = `input[name="${field.value}"]`;
+                    const element = await page.$(selector);
+                    console.log(`Checking existence of selector: ${selector} - Found: ${element !== null}`);
+                    return element !== null;
+                })
             );
             const isAllTextFieldsExist = hasTextFields.every(exist => exist);
-            const isAnyTextFieldHiddenOrReadonly = await Promise.all(
-                textFields.map(field => page.$eval(`input[name="${field.value}"]`, el => el.hidden || el.readOnly))
-            );
+            console.log("isAllTextFieldsExist:", isAllTextFieldsExist);
 
-            const hasSubmitButton = await page.$(formData.submit) !== null;
+            const isAnyTextFieldHiddenOrReadonly = await Promise.all(
+                textFields.map(async field => {
+                    const element = await page.$(`input[name="${field.value}"]`);
+                    if (element !== null) {
+                        return await page.$eval(`input[name="${field.value}"]`, el => el.type === 'hidden' || el.readOnly);
+                    } else {
+                        return false; // セレクタに一致する要素がない場合の値
+                    }
+                })
+            );
+            console.log("isAnyTextFieldHiddenOrReadonly :", isAnyTextFieldHiddenOrReadonly );
+
+
+            const hasSubmitButton = await page.$('input[type="submit"], button[type="submit"]') !== null;
+            console.log("hasSubmitButton:", hasSubmitButton);
         
             // 条件に基づいて状態を判定
             let currentState;
@@ -477,6 +496,6 @@ Note:
         
             await page.screenshot({ path: screenshotPath, fullPage: true });
         }
-        await browser.close();     
+        //await browser.close();     
     }                 
 run().catch(console.error);
