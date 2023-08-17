@@ -11,6 +11,32 @@ const openai = new OpenAIApi(configuration);
 const maxProcessOnInputTrials = 2;
 const maxTotalTrials = 4;
 
+const dataToSend = {
+    "company_name": "営業製作所株式会社",
+    "contact_person": "安田　美佳",
+    "contact_person_kana": "やすだ　みか",
+    "last_name_kanji": "安田",
+    "first_name_kanji": "美佳",
+    "last_name_kana": "やすだ",
+    "first_name_kana": "みか",
+    "email": "m.yasuda@sales-bank.com",
+    "phone": "06-6136-8027",
+    "phone_area_code": "06",
+    "phone_prefix": "6136",
+    "phone_line_number": "8027",
+    "postal_code": "550-0002",
+    "postal_code_prefix": "550",
+    "postal_code_suffix": "0002",
+    "address": "大阪府大阪市西区江戸堀1-22-38　三洋ビル501",
+    "date_of_birth": "1992年4月14日",
+    "reply_method": "メール",
+    "department": "営業部",
+    "position": "主査",
+    "subject": "【製造業7,000名の担当者から廃材回収のニーズを頂戴しております】",
+    "inquiry_content": 
+    "代表者様 \nお世話になります。\n営業製作所の安田と申します。\n製造業の担当者7,000名から廃材回収に関するニーズを頂戴しております\n具体的なニーズの有無まで調査行い、ご紹介が可能ですのでご連絡させていただきました。\n弊社は、製造業に特化した事業を展開しており、 サービスリリース2年で500社の企業様にご活用いただいております。\n貴社の回収しやすい【材質】【大きさ】【形状】【重量】を満たす、取引先を発掘することが可能です。 \n同業他社での実績や貴社に合致したレポートをご用意しておりますので、ご興味をお持ち頂ける場合はお電話にて詳細をお伝えします。\n 下記メールアドレスにお電話可能な日時をお送りくださいませ。\n ■メールアドレス m.yasuda@sales-bank.com \n■弊社パンフレット https://tinyurl.com/239r55dc \nそれではご連絡お待ちしております。"
+};
+
 // 対象のURLの定義
 const url = 'https://sales-bank.com/contact/';
 
@@ -70,12 +96,9 @@ async function run() {
                 console.log("Max total trials reached, exiting...");
             }
         }
-    
 
-        //cheerioとGPT-4を活用したinputのname属性と入力値をマッチさせる関数
-        async function processOnInput(page) {
+        async function handleAgreementButton(page) {
             try {
-                // チェックボックスと同意ボタンのクリック処理
                 const [checkbox] = await page.$x("//input[@type='checkbox']");
                 if (checkbox) {
                     await checkbox.click();
@@ -89,6 +112,9 @@ async function run() {
             } catch (error) {
                 console.log('No agreement button found');
             }
+        }
+        
+        async function extractFormHTML(page) {
             // formタグを抽出
             const html = await page.content();
             let $ = cheerio.load(html);
@@ -149,94 +175,97 @@ async function run() {
                 if (responseProcessingPromise) {
                     longestFormHTML = await responseProcessingPromise; // 戻り値をlongestFormHTMLに代入
                 }
+            } 
+            return longestFormHTML; // 最長のフォームHTMLを返す
+        }
+
+        function analyzeFields(longestFormHTML) { 
+            // HTMLからfieldsを作成
+            const $ = cheerio.load(longestFormHTML);
+            const fields = [];
+            
+            const parseField = (el, type) => {
+                const name = $(el).attr('name') || $(el).attr('id') || $(el).attr('class');
+                const value = name;
+                // ①labelとinput等が親子関係になく、forとidで関連付けの場合
+                let label = $(`label[for="${name}"]`).text() || $(`label[for="${$(el).attr('id')}"]`).text() || '';
+                // ②labelとinput等が親子関係の場合
+                if (label === '') {
+                    label = $(el).parent('label').text() || '';
+                }
+            
+                if (type === "radio" || type === "checkbox") {
+                    const selectValue = $(el).attr('value');
+                    const existingField = fields.find(field => field.name === value && field.type === type);
+                    if (existingField) {
+                        existingField.values.push({ selectValue: selectValue, label: label }); // キー名を selectValue に変更
+                    } else {
+                        fields.push({ name: value, value: name, type: type, values: [{ selectValue: selectValue, label: label }] }); // キー名を selectValue に変更
+                    }
+                } else {
+                    fields.push({ name: value, value: name, type: type, label: label });
+                }
+            };
+                              
+            // input fields
+            $('input[type="text"], input[type="email"], input[type="date"], input[type="month"], input[type="number"], input[type="tel"], input[type="time"], input[type="url"], input[type="week"], textarea').each(function() {
+                parseField(this, $(this).attr('type') || 'textarea');
+            });
+            
+            // radio and checkbox fields
+            $('input[type="radio"], input[type="checkbox"]').each(function() {
+                parseField(this, $(this).attr('type'));
+            });
+            
+            // select fields
+            $('select').each(function() {
+                const name = $(this).attr('name') || $(this).attr('id') || $(this).attr('class');
+                const value = name;
+                const type = 'select';
+                const values = [];
+                $(this).find('option').each(function() {
+                    values.push({ selectValue: $(this).attr('value') }); // キー名を selectValue に変更
+                });
+                fields.push({ name: value, value: name, type: type, values: values });
+            });
+            
+            // submit button
+            const submitButtonName = $('button[type="submit"], input[type="submit"]').attr('name');
+            const submitType = submitButtonName ? ($('input[name="' + submitButtonName + '"]').length > 0 ? 'input' : 'button') : 'button';
+            const submit = submitButtonName ? `${submitType}[name="${submitButtonName}"]` : 'button[type="submit"]';  
+            return { fields, submit };
+        }
+                        
+        //cheerioとGPT-4を活用したinputのname属性と入力値をマッチさせる関数
+        async function processOnInput(page) {
+            await handleAgreementButton(page);
+            const longestFormHTML = await extractFormHTML(page);
+            if (longestFormHTML === undefined) {
+                console.log("Error: longestFormHTML is undefined.");
+                return;
             }
             if (longestFormHTML.length === 0) {
                 console.log("No form found. Exiting...");
-            } else {
-                // HTMLからfieldsを作成
-                const $ = cheerio.load(longestFormHTML);
-                const fields = [];
-                
-                const parseField = (el, type) => {
-                    const name = $(el).attr('name') || $(el).attr('id') || $(el).attr('class');
-                    const value = name;
-                    // ①labelとinput等が親子関係になく、forとidで関連付けの場合
-                    let label = $(`label[for="${name}"]`).text() || $(`label[for="${$(el).attr('id')}"]`).text() || '';
-                    // ②labelとinput等が親子関係の場合
-                    if (label === '') {
-                        label = $(el).parent('label').text() || '';
-                    }
-                
-                    if (type === "radio" || type === "checkbox") {
-                        const selectValue = $(el).attr('value');
-                        const existingField = fields.find(field => field.name === value && field.type === type);
-                        if (existingField) {
-                            existingField.values.push({ selectValue: selectValue, label: label }); // キー名を selectValue に変更
-                        } else {
-                            fields.push({ name: value, value: name, type: type, values: [{ selectValue: selectValue, label: label }] }); // キー名を selectValue に変更
-                        }
-                    } else {
-                        fields.push({ name: value, value: name, type: type, label: label });
-                    }
-                };
-                                  
-                // input fields
-                $('input[type="text"], input[type="email"], input[type="date"], input[type="month"], input[type="number"], input[type="tel"], input[type="time"], input[type="url"], input[type="week"], textarea').each(function() {
-                    parseField(this, $(this).attr('type') || 'textarea');
-                });
-                
-                // radio and checkbox fields
-                $('input[type="radio"], input[type="checkbox"]').each(function() {
-                    parseField(this, $(this).attr('type'));
-                });
-                
-                // select fields
-                $('select').each(function() {
-                    const name = $(this).attr('name') || $(this).attr('id') || $(this).attr('class');
-                    const value = name;
-                    const type = 'select';
-                    const values = [];
-                    $(this).find('option').each(function() {
-                        values.push({ selectValue: $(this).attr('value') }); // キー名を selectValue に変更
-                    });
-                    fields.push({ name: value, value: name, type: type, values: values });
-                });
-                
-                // submit button
-                const submitButtonName = $('button[type="submit"], input[type="submit"]').attr('name');
-                const submitType = submitButtonName ? ($('input[name="' + submitButtonName + '"]').length > 0 ? 'input' : 'button') : 'button';
-                const submit = submitButtonName ? `${submitType}[name="${submitButtonName}"]` : 'button[type="submit"]';                            
-                            
-                const dataToSend = {
-"company_name": "営業製作所株式会社",
-"contact_person": "安田　美佳",
-"contact_person_kana": "やすだ　みか",
-"last_name_kanji": "安田",
-"first_name_kanji": "美佳",
-"last_name_kana": "やすだ",
-"first_name_kana": "みか",
-"email": "m.yasuda@sales-bank.com",
-"phone": "06-6136-8027",
-"phone_area_code": "06",
-"phone_prefix": "6136",
-"phone_line_number": "8027",
-"postal_code": "550-0002",
-"postal_code_prefix": "550",
-"postal_code_suffix": "0002",
-"address": "大阪府大阪市西区江戸堀1-22-38　三洋ビル501",
-"date_of_birth": "1992年4月14日",
-"reply_method": "メール",
-"department": "営業部",
-"position": "主査",
-"subject": "【製造業7,000名の担当者から廃材回収のニーズを頂戴しております】",
-"inquiry_content": 
-"代表者様 \nお世話になります。\n営業製作所の安田と申します。\n製造業の担当者7,000名から廃材回収に関するニーズを頂戴しております\n具体的なニーズの有無まで調査行い、ご紹介が可能ですのでご連絡させていただきました。\n弊社は、製造業に特化した事業を展開しており、 サービスリリース2年で500社の企業様にご活用いただいております。\n貴社の回収しやすい【材質】【大きさ】【形状】【重量】を満たす、取引先を発掘することが可能です。 \n同業他社での実績や貴社に合致したレポートをご用意しておりますので、ご興味をお持ち頂ける場合はお電話にて詳細をお伝えします。\n 下記メールアドレスにお電話可能な日時をお送りくださいませ。\n ■メールアドレス m.yasuda@sales-bank.com \n■弊社パンフレット https://tinyurl.com/239r55dc \nそれではご連絡お待ちしております。"
-                };
-                const originalInquiryContent = dataToSend.inquiry_content;
-                dataToSend.inquiry_content = dataToSend.inquiry_content.substring(0, 20);
-                const resultJson = { fields, submit };
-                const fieldsJsonString = JSON.stringify(resultJson);
-                const promptContent = `
+                return;
+            }
+            const { fields, submit } = analyzeFields(longestFormHTML);
+
+            const originalInquiryContent = dataToSend.inquiry_content;
+            dataToSend.inquiry_content = dataToSend.inquiry_content.substring(0, 20);
+            const promptContent = createMappingPrompt(fields, submit, dataToSend);
+            const formData = await requestAndAnalyzeMapping(promptContent);
+            formatAndLogFormData(formData, originalInquiryContent);
+            await fillFormFields(page, formData, dataToSend, originalInquiryContent);
+            await submitForm(page, formData);
+            await currentState(page, formData);
+        
+            return formData;
+        }
+
+        function createMappingPrompt(fields, submit, dataToSend) {
+            const resultJson = { fields, submit };
+            const fieldsJsonString = JSON.stringify(resultJson);
+            const promptContent = `
 Analyze the following fields:
 ${fieldsJsonString}
 ・Standard field configuration:
@@ -283,103 +312,123 @@ Note:
 - The following fields is in Japanese.
 - You must always remove the "label" in the JSON format you provide.
 - It is not necessary to use all the content in dataToSend, you must only map what's relevant.
-`;                         
-     
-                    const completion = await openai.createChatCompletion({
-                        model: "gpt-4",
-                        messages: [
-                            {"role": "system", "content": "You are a professional who deeply understands the structure of HTML and is proficient in both English and Japanese. You are capable of minimizing mistakes, carefully verifying multiple times, and handling tasks with precision."},
-                            {"role": "user", "content": promptContent}
-                        ]                    
-                    });     
-                    // GPT-4からのレスポンス       
-                    const mappedName = completion.data.choices[0].message.content;
+`;                    
+        return promptContent;
+        }     
 
-                    // 最初の波括弧 '{' のインデックスを取得
-                    const startIndex = mappedName.indexOf('{');
+        async function requestAndAnalyzeMapping(promptContent) {
+            const completion = await openai.createChatCompletion({
+                model: "gpt-4",
+                messages: [
+                    {"role": "system", "content": "You are a professional who deeply understands the structure of HTML and is proficient in both English and Japanese. You are capable of minimizing mistakes, carefully verifying multiple times, and handling tasks with precision."},
+                    {"role": "user", "content": promptContent}
+                ]                    
+            });     
+            // GPT-4からのレスポンス       
+            const mappedName = completion.data.choices[0].message.content;
 
-                    // 最後の波括弧 '}' のインデックスを取得
-                    const endIndex = mappedName.lastIndexOf('}');
+            // 最初の波括弧 '{' のインデックスを取得
+            const startIndex = mappedName.indexOf('{');
 
-                    // 開始インデックスと終了インデックスを使用してJSON文字列を抽出
-                    const jsonStr = mappedName.substring(startIndex, endIndex + 1);
+            // 最後の波括弧 '}' のインデックスを取得
+            const endIndex = mappedName.lastIndexOf('}');
 
-                    // コメントを削除（//から始まる行を削除）
-                    const jsonWithoutComments = jsonStr.replace(/\/\/.*$/gm, '');
+            // 開始インデックスと終了インデックスを使用してJSON文字列を抽出
+            const jsonStr = mappedName.substring(startIndex, endIndex + 1);
 
-                    // JSON文字列をパース
-                    const formData = JSON.parse(jsonWithoutComments);
+            // コメントを削除（//から始まる行を削除）
+            const jsonWithoutComments = jsonStr.replace(/\/\/.*$/gm, '');
 
-                    // radio、checkbox、およびselectのvaluesプロパティを配列に変換
-                    dataToSend.inquiry_content = originalInquiryContent;
-                    
-                    formData.fields.forEach((field) => {
-                        if ((field.type === 'radio' || field.type === 'checkbox' || field.type === 'select') && typeof field.values === 'string') {
-                            field.values = [{ selectValue: field.values }]; // 文字列をオブジェクトの配列に変換
-                        }
-                    });
+            // JSON文字列をパース
+            const formData = JSON.parse(jsonWithoutComments);
 
-                    console.log("Parsed Form Data:", formData); // パース後のオブジェクトをログ出力
-
-                    //formDataを元にフォームに入力を行う
-                    for (const field of formData.fields) {
-                        if (!field.name) continue; // field.nameがnullまたは空の場合、次のイテレーションにスキップ
-                        const valueToSend = dataToSend[field.name]; // 対応する値を取得
-                        if (valueToSend === undefined && field.type !== 'radio' && field.type !== 'checkbox' && field.type !== 'select') continue; // valueToSendがundefinedで、タイプがradio、checkbox、selectでない場合、次のイテレーションにスキップ
-                        switch (field.type) {                  
-                        case 'text':
-                        case 'email':
-                        case 'date':
-                        case 'month':
-                        case 'number':
-                        case 'tel':
-                        case 'time':
-                        case 'url':
-                        case 'week':
-                        console.log(`Field name: ${field.name}, value to send:`, valueToSend); 
-                        await page.type(`input[name="${field.value}"]`, valueToSend); // 値を入力
-                        break;
-                        case 'textarea':
-                            await page.type(`textarea[name="${field.value}"]`, valueToSend); // テキストエリアに値を入力
-                            console.log(`Textarea filled: Field name: ${field.name}, value: ${valueToSend}`);
-                            break;
-                        case 'radio':
-                            const selectedRadioValue = field.values[0].selectValue; // 選択する値を取得
-                            await page.click(`input[name="${field.value}"][value="${selectedRadioValue}"]`); // ラジオボタンを選択
-                            console.log(`Radio selected: Field name: ${field.name}, value: ${selectedRadioValue}`);
-                            break;
-                        case 'checkbox':
-                            const selectedCheckboxValue = field.values[0].selectValue; // 選択する値を取得
-                            if (selectedCheckboxValue) { // チェックボックスが選択されている場合
-                                await page.click(`input[name="${field.value}"][value="${selectedCheckboxValue}"]`);
-                                console.log(`Checkbox selected: Field name: ${field.name}, value: ${selectedCheckboxValue}`);
-                            }
-                            break;
-                        case 'select':
-                            const selectedSelectValue = field.values[0].selectValue; // 選択する値を取得
-                            await page.select(`select[name="${field.value}"]`, selectedSelectValue); // セレクトボックスを選択
-                            console.log(`Select value chosen: Field name: ${field.name}, value: ${selectedSelectValue}`);
-                            break;
-                        // 他のタイプに対応する場合、ここに追加のケースを追加します
-                        }
-                            // 3秒から5秒のランダムな待機時間を追加
-                        const milliseconds = Math.floor(Math.random() * 500) + 1000;
-                        await new Promise(r => setTimeout(r, milliseconds));
-                        }
-                    
-                    //スクリーンショットを撮る
-                    await takeScreenshot(page, 'input');
-
-                    // viewportを元に戻す
-                    await page.setViewport({ width: 800, height: 600 });
-                    await new Promise(r => setTimeout(r, 1000));
-                    await page.click(formData.submit);
-                    await currentState(page, formData);
-                    return formData;
-                }
-            }
+            return formData;
         }
+                
+                    
 
+
+        function formatAndLogFormData(formData, originalInquiryContent) {
+            // radio、checkbox、およびselectのvaluesプロパティを配列に変換
+            formData.inquiry_content = originalInquiryContent;
+            formData.fields.forEach((field) => {
+                if ((field.type === 'radio' || field.type === 'checkbox' || field.type === 'select') && typeof field.values === 'string') {
+                    field.values = [{ selectValue: field.values }]; // 文字列をオブジェクトの配列に変換
+                }
+            });
+            console.log("Parsed Form Data:", formData); // パース後のオブジェクトをログ出力
+        }
+        
+        //フィールドごとに入力処理を行う関数
+        async function handleFieldInput(page, field, valueToSend) {
+            switch (field.type) {              
+                case 'text':
+                case 'email':
+                case 'date':
+                case 'month':
+                case 'number':
+                case 'tel':
+                case 'time':
+                case 'url':
+                case 'week':
+                console.log(`Field name: ${field.name}, value to send:`, valueToSend); 
+                await page.type(`input[name="${field.value}"]`, valueToSend); // 値を入力
+                break;
+                case 'textarea':
+                    await page.type(`textarea[name="${field.value}"]`, valueToSend); // テキストエリアに値を入力
+                    console.log(`Textarea filled: Field name: ${field.name}, value: ${valueToSend}`);
+                    break;
+                case 'radio':
+                    const selectedRadioValue = field.values[0].selectValue; // 選択する値を取得
+                    await page.click(`input[name="${field.value}"][value="${selectedRadioValue}"]`); // ラジオボタンを選択
+                    console.log(`Radio selected: Field name: ${field.name}, value: ${selectedRadioValue}`);
+                    break;
+                case 'checkbox':
+                    const selectedCheckboxValue = field.values[0].selectValue; // 選択する値を取得
+                    if (selectedCheckboxValue) { // チェックボックスが選択されている場合
+                        await page.click(`input[name="${field.value}"][value="${selectedCheckboxValue}"]`);
+                        console.log(`Checkbox selected: Field name: ${field.name}, value: ${selectedCheckboxValue}`);
+                    }
+                    break;
+                case 'select':
+                    const selectedSelectValue = field.values[0].selectValue; // 選択する値を取得
+                    await page.select(`select[name="${field.value}"]`, selectedSelectValue); // セレクトボックスを選択
+                    console.log(`Select value chosen: Field name: ${field.name}, value: ${selectedSelectValue}`);
+                    break;
+                // 他のタイプに対応する場合、ここに追加のケースを追加します
+            }
+                // 0.5秒から1秒のランダムな待機時間を追加
+            const milliseconds = Math.floor(Math.random() * 500) + 1000;
+            await new Promise(r => setTimeout(r, milliseconds));
+        }
+                
+        //全フィールドに対して入力処理を行う関数
+        async function fillFormFields(page, formData, dataToSend, originalInquiryContent) {
+            for (const field of formData.fields) {
+                if (!field.name) continue;
+                let valueToSend = dataToSend[field.name];
+                
+                // inquiry_content フィールドの場合、元の内容に戻す
+                if (field.name === 'inquiry_content') {
+                    valueToSend = originalInquiryContent;
+                }
+        
+                if (valueToSend === undefined && field.type !== 'radio' && field.type !== 'checkbox' && field.type !== 'select') continue;
+                await handleFieldInput(page, field, valueToSend);
+            }
+        }        
+
+        //フォームの送信処理を行う関数
+        async function submitForm(page, formData) {
+            // スクリーンショットを撮る
+            await takeScreenshot(page, 'input');
+        
+            // viewportを元に戻す
+            await page.setViewport({ width: 800, height: 600 });
+            await new Promise(r => setTimeout(r, 1000));
+            await page.click(formData.submit);
+        }
+        
         //現在地を確認する関数
         async function currentState(page,formData) {
             if (!formData || !formData.fields) {
@@ -500,6 +549,8 @@ Note:
         
             await page.screenshot({ path: screenshotPath, fullPage: true });
         }
-        await browser.close();     
-    }                 
+        await browser.close(); 
+
+    }    
+}                
 run().catch(console.error);
