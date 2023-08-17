@@ -9,7 +9,7 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 const maxProcessOnInputTrials = 2;
-const maxTotalTrials = 3;
+const maxTotalTrials = 4;
 
 // 対象のURLの定義
 const url = 'https://sales-bank.com/contact/';
@@ -35,13 +35,13 @@ async function run() {
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 10000 });
 
     await mainProcess(page);
-
+    //主要なループ関数
     async function mainProcess(page) {
         let state = 'INPUT';
         let processOnInputTrial = 0;
         let totalTrial = 0;
         let formData; // formDataを保存するための変数
-        while (state !== 'COMPLETE' && totalTrial < maxTotalTrials) {
+        while (state !== 'DONE' && totalTrial < maxTotalTrials) {
             switch (state) {
                 case 'INPUT':
                     if (processOnInputTrial < maxProcessOnInputTrials) {
@@ -56,19 +56,23 @@ async function run() {
                     break;
                 case 'COMPLETE':
                     await processOnComplete(page);
-                    break;
+                    state = 'DONE'; 
+                    continue; // この状態でループを再開する
                 case 'ERROR':
                     state = await processOnError(page); // エラー処理後に状態を更新
                     continue; // 次の繰り返しに直ちに進む
             }
-        
-            state = await currentState(page,formData); 
+
+            state = await currentState(page, formData);
+            console.log('State in mainProcess:', state);
             totalTrial++;
             if (totalTrial >= maxTotalTrials) {
                 console.log("Max total trials reached, exiting...");
             }
         }
+    
 
+        //cheerioとGPT-4を活用したinputのname属性と入力値をマッチさせる関数
         async function processOnInput(page) {
             try {
                 // チェックボックスと同意ボタンのクリック処理
@@ -280,8 +284,7 @@ Note:
 - You must always remove the "label" in the JSON format you provide.
 - It is not necessary to use all the content in dataToSend, you must only map what's relevant.
 `;                         
-
-                
+     
                     const completion = await openai.createChatCompletion({
                         model: "gpt-4",
                         messages: [
@@ -318,6 +321,7 @@ Note:
 
                     console.log("Parsed Form Data:", formData); // パース後のオブジェクトをログ出力
 
+                    //formDataを元にフォームに入力を行う
                     for (const field of formData.fields) {
                         if (!field.name) continue; // field.nameがnullまたは空の場合、次のイテレーションにスキップ
                         const valueToSend = dataToSend[field.name]; // 対応する値を取得
@@ -363,11 +367,10 @@ Note:
                         await new Promise(r => setTimeout(r, milliseconds));
                         }
                     
-                    // フォームの入力が完了した後、送信ボタンをクリックする前にスクリーンショットを撮る
                     //スクリーンショットを撮る
                     await takeScreenshot(page, 'input');
 
-                    // viewportを元に戻す（必要に応じて）
+                    // viewportを元に戻す
                     await page.setViewport({ width: 800, height: 600 });
                     await new Promise(r => setTimeout(r, 1000));
                     await page.click(formData.submit);
@@ -377,8 +380,8 @@ Note:
             }
         }
 
+        //現在地を確認する関数
         async function currentState(page,formData) {
-            console.log("formData in currentState:", formData); 
             if (!formData || !formData.fields) {
                 console.error("formData or formData.fields is undefined in currentState function");
                 return;
@@ -400,13 +403,11 @@ Note:
                 textFields.map(async field => {
                     const selector = `input[name="${field.value}"]`;
                     const element = await page.$(selector);
-                    console.log(`Checking existence of selector: ${selector} - Found: ${element !== null}`);
                     return element !== null;
                 })
             );
             const isAllTextFieldsExist = hasTextFields.every(exist => exist);
-            console.log("isAllTextFieldsExist:", isAllTextFieldsExist);
-
+            //hidden,readonlyが含まれているかチェック
             const isAnyTextFieldHiddenOrReadonly = await Promise.all(
                 textFields.map(async field => {
                     const element = await page.$(`input[name="${field.value}"]`);
@@ -417,11 +418,8 @@ Note:
                     }
                 })
             );
-            console.log("isAnyTextFieldHiddenOrReadonly :", isAnyTextFieldHiddenOrReadonly );
-
-
+            //送信ボタンの有無をチェック
             const hasSubmitButton = await page.$('input[type="submit"], button[type="submit"]') !== null;
-            console.log("hasSubmitButton:", hasSubmitButton);
         
             // 条件に基づいて状態を判定
             let currentState;
@@ -442,14 +440,15 @@ Note:
         
                 // 応答に基づいて状態を返す
                 const responseMessage = completion.data.choices[0].message;
-                console.log("Response message type:", typeof responseMessage);
-                console.log("Response message content:", responseMessage);
                 const responseContentString = responseMessage.content.match(/\{[^\}]+\}/)[0];
                 const responseContent = JSON.parse(responseContentString);
                 currentState = responseContent["位置"];
-                console.log('Detected state:', currentState);
-                if (currentState === '完了') return 'COMPLETE';
-                if (currentState === 'エラー') return 'ERROR';
+                if (currentState === '完了') {
+                    return 'COMPLETE';
+                }
+                if (currentState === 'エラー') {
+                    return 'ERROR';
+                }
             } else {
                 // 予期しない応答があればデフォルト状態を返す
                 currentState = 'UNKNOWN';
@@ -466,7 +465,6 @@ Note:
                     //スクリーンショット撮る
                     await takeScreenshot(page, 'confirm');
                     
-                    console.log('Clicking the button:', buttonText);
                     const navigationPromise = page.waitForNavigation({ timeout: 10000 });
                     await button.click();
                     await navigationPromise; // ページの遷移を待つ
@@ -479,8 +477,14 @@ Note:
             console.log("An error state has been detected!");        
             // スクリーンショットを撮る
             await takeScreenshot(page, 'error');
-        
             return 'INPUT';
+        }
+
+        async function processOnComplete(page){
+        console.log("Complete!");        
+        // スクリーンショットを撮る
+        await takeScreenshot(page, 'complete');
+        return 'DONE';
         }
 
         async function takeScreenshot(page, stage = '') {
@@ -496,6 +500,6 @@ Note:
         
             await page.screenshot({ path: screenshotPath, fullPage: true });
         }
-        //await browser.close();     
+        await browser.close();     
     }                 
 run().catch(console.error);
