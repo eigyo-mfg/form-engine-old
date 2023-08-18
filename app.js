@@ -70,37 +70,39 @@ async function getUrls() {
     };
   
     let response = await gsapi.spreadsheets.values.get(request);
-    let urls = response.data.values.flat(); // URLの配列を取得
+    let urls = response.data.values.flat().slice(1);
+    console.log(urls); // この行を追加
     return urls;
 }
-  
-
-// 対象のURLの定義
-const url = 'https://sales-bank.com/contact/';
 
 // メインの非同期関数の定義
-async function run() {
-    // ブラウザとページの設定
+async function run(urls) { // 引数にurlsを追加
     const browser = await puppeteer.launch({ headless: false });
-    const page = await browser.newPage();
-    // リクエストの監視設定
-    await page.setRequestInterception(true);
-    page.on('request', (req) => {
-         // Google Analyticsと画像、スタイルシート、フォントのリクエストを中止
+    for (const url of urls) { // URLの配列をループ
+      const page = await browser.newPage();
+      await page.setRequestInterception(true);
+      page.on('request', (req) => {
         if (req.url().includes('www.google-analytics.com')) {
-            req.abort();
+          req.abort();
         } else if (['image', 'stylesheet', 'font'].indexOf(req.resourceType()) !== -1) {
-            req.abort();
+          req.abort();
         } else {
-            req.continue();
+          req.continue();
         }
-    });
-    // ページへの移動と要素のクリック
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 10000 });
-    await mainProcess(page);
-    await browser.close(); 
-}                
-run().catch(console.error);
+      });
+      await page.goto(url, { waitUntil: 'networkidle0', timeout: 10000 });
+      await mainProcess(page);
+      await page.close();
+    }
+  
+    await browser.close();
+  }
+  run().catch(console.error);
+  
+  // 以下の部分でgetUrls関数を呼び出してURLを取得し、それをrun関数に渡します。
+getUrls().then(urls => {
+    run(urls).catch(console.error);
+});
 
 
 //主要なループ関数
