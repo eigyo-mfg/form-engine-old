@@ -1,2 +1,4 @@
 .env
-/Users/nishishimamotoshu/開発PJ/form-engine/serviceAccountKey.json
+node_modules/
+serviceAccountKey.json
+spread.json
