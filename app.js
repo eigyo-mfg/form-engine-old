@@ -9,7 +9,8 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 const maxProcessOnInputTrials = 2;
-const maxTotalTrials = 4;
+const maxTotalTrials = 5;
+const db = require('./firestore');
 
 //送りたい内容。プロジェクトごとに値は変更可能
 const dataToSend = {
@@ -36,8 +37,43 @@ const dataToSend = {
     "position": "主査",
     "subject": "【製造業7,000名の担当者から廃材回収のニーズを頂戴しております】",
     "inquiry_content": 
-    "代表者様 \nお世話になります。\n営業製作所の安田と申します。\n製造業の担当者7,000名から廃材回収に関するニーズを頂戴しております\n具体的なニーズの有無まで調査行い、ご紹介が可能ですのでご連絡させていただきました。\n弊社は、製造業に特化した事業を展開しており、 サービスリリース2年で500社の企業様にご活用いただいております。\n貴社の回収しやすい【材質】【大きさ】【形状】【重量】を満たす、取引先を発掘することが可能です。 \n同業他社での実績や貴社に合致したレポートをご用意しておりますので、ご興味をお持ち頂ける場合はお電話にて詳細をお伝えします。\n 下記メールアドレスにお電話可能な日時をお送りくださいませ。\n ■メールアドレス m.yasuda@sales-bank.com \n■弊社パンフレット https://tinyurl.com/239r55dc \nそれではご連絡お待ちしております。"
+    "代表者様 \nお世話になります。\n営業製作所の安田と申します。\n\n製造業の担当者7,000名から廃材回収に関するニーズを頂戴しております\n具体的なニーズの有無まで調査行い、ご紹介が可能ですのでご連絡させていただきました。\n\n弊社は、製造業に特化した事業を展開しており、 サービスリリース2年で500社の企業様にご活用いただいております。\n\n貴社の回収しやすい【材質】【大きさ】【形状】【重量】を満たす、取引先を発掘することが可能です。 \n同業他社での実績や貴社に合致したレポートをご用意しておりますので、ご興味をお持ち頂ける場合はお電話にて詳細をお伝えします。\n\n 下記メールアドレスにお電話可能な日時をお送りくださいませ。\n\n ■メールアドレス m.yasuda@sales-bank.com \n■弊社パンフレット https://tinyurl.com/239r55dc \nそれではご連絡お待ちしております。"
 };
+
+// Google Sheets APIの初期化
+const { google } = require('googleapis');
+const keys = require('./spread.json');
+
+const client = new google.auth.JWT(
+  keys.client_email,
+  null,
+  keys.private_key,
+  ['https://www.googleapis.com/auth/spreadsheets']
+);
+
+client.authorize(function (err, tokens) {
+  if (err) {
+    console.log(err);
+    return;
+  } else {
+    console.log('Connected to Google Sheets API');
+  }
+});
+
+const gsapi = google.sheets({ version: 'v4', auth: client });
+
+async function getUrls() {
+    const sheetId = '11wyDbzPIcTi4bS0lnuDJVrvUjgVKirzTKScsJ4iNZgc'; // スプレッドシートのIDをここに入力
+    const request = {
+      spreadsheetId: sheetId,
+      range: 'Sheet1!D:D', // D列を指定
+    };
+  
+    let response = await gsapi.spreadsheets.values.get(request);
+    let urls = response.data.values.flat(); // URLの配列を取得
+    return urls;
+}
+  
 
 // 対象のURLの定義
 const url = 'https://sales-bank.com/contact/';
@@ -125,7 +161,6 @@ const formData = await requestAndAnalyzeMapping(promptContent);
 formatAndLogFormData(formData, originalInquiryContent);
 await fillFormFields(page, formData, dataToSend, originalInquiryContent);
 await submitForm(page, formData);
-await currentState(page, formData);
 
 return formData;
 }
@@ -367,6 +402,7 @@ return promptContent;
 async function requestAndAnalyzeMapping(promptContent) {
     const completion = await openai.createChatCompletion({
         model: "gpt-4",
+        temperature:0.2,
         messages: [
             {"role": "system", "content": "You are a professional who deeply understands the structure of HTML and is proficient in both English and Japanese. You are capable of minimizing mistakes, carefully verifying multiple times, and handling tasks with precision."},
             {"role": "user", "content": promptContent}
