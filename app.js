@@ -12,6 +12,9 @@ const maxProcessOnInputTrials = 2;
 const maxTotalTrials = 5;
 const db = require('./firestore');
 
+// スプレッドシートのIDをここに入力
+const sheetId = '11wyDbzPIcTi4bS0lnuDJVrvUjgVKirzTKScsJ4iNZgc'; 
+
 //送りたい内容。プロジェクトごとに値は変更可能
 const dataToSend = {
     "company_name": "営業製作所株式会社",
@@ -63,7 +66,6 @@ client.authorize(function (err, tokens) {
 const gsapi = google.sheets({ version: 'v4', auth: client });
 
 async function getUrls() {
-    const sheetId = '11wyDbzPIcTi4bS0lnuDJVrvUjgVKirzTKScsJ4iNZgc'; // スプレッドシートのIDをここに入力
     const request = {
       spreadsheetId: sheetId,
       range: 'Sheet1!D:D', // D列を指定
@@ -76,52 +78,76 @@ async function getUrls() {
 }
 
 // メインの非同期関数の定義
-async function run(urls) { // 引数にurlsを追加
+async function run(url) {
     const browser = await puppeteer.launch({ headless: false });
-    for (const url of urls) { // URLの配列をループ
-      const page = await browser.newPage();
-      await page.setRequestInterception(true);
-      page.on('request', (req) => {
+    const page = await browser.newPage();
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
         if (req.url().includes('www.google-analytics.com')) {
-          req.abort();
+            req.abort();
         } else if (['image', 'stylesheet', 'font'].indexOf(req.resourceType()) !== -1) {
-          req.abort();
+            req.abort();
         } else {
-          req.continue();
+            req.continue();
         }
-      });
-      await page.goto(url, { waitUntil: 'networkidle0', timeout: 10000 });
-      await mainProcess(page);
-      await page.close();
-    }
-  
+    });
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 10000 });
+    await mainProcess(page);
+    await page.close();
     await browser.close();
-  }
-  run().catch(console.error);
-  
-  // 以下の部分でgetUrls関数を呼び出してURLを取得し、それをrun関数に渡します。
-getUrls().then(urls => {
-    run(urls).catch(console.error);
-});
+}
 
+  // チャンクに分割する関数
+function chunkArray(array, size) {
+    const result = [];
+    for (let i = 0; i < array.length; i += size) {
+        result.push(array.slice(i, i + size));
+    }
+    return result;
+}
 
-//主要なループ関数
+async function main() {
+    const urls = await getUrls();
+    const chunks = chunkArray(urls, 3); // 3つのチャンクに分割
+
+    for (const chunk of chunks) {
+        const promises = chunk.map(url => run(url)); // 各URLに対してrun関数を呼び出す
+        await Promise.all(promises); // 並列に実行
+    }
+}
+main().catch(console.error);
+
+function generateDocumentId(url) {
+    // URLの最後がスラッシュで終わっている場合、それを削除
+    if (url.endsWith('/')) {
+        url = url.slice(0, -1);
+    }
+    // プロトコル部分を削除
+    url = url.replace(/^https?:\/\//, '');
+    return url.replace(/\//g, '__');
+}
+
 async function mainProcess(page) {
     let state = 'INPUT';
     let processOnInputTrial = 0;
     let totalTrial = 0;
     let formData; // formDataを保存するための変数
+    let confirmation = false; // 確認画面の存在をチェックする変数
+    let formKey; // FirestoreのドキュメントIDを保存する変数
+
     while (state !== 'DONE' && totalTrial < maxTotalTrials) {
         switch (state) {
             case 'INPUT':
                 if (processOnInputTrial < maxProcessOnInputTrials) {
                     processOnInputTrial++;
                     formData = await processOnInput(page); // formDataを受け取る
+                    formKey = generateDocumentId(await page.url()); // ドキュメントIDを保存
                 } else {
                     console.log("Max processOnInput trials reached, skipping...");
                 }
                 break;
             case 'CONFIRM':
+                confirmation = true; // 確認画面が存在する場合
                 await processOnConfirm(page);
                 break;
             case 'COMPLETE':
@@ -140,31 +166,54 @@ async function mainProcess(page) {
             console.log("Max total trials reached, exiting...");
         }
     }
+
+    // Firestoreへの追加データ保存部分
+    const masterCollectionRef = db.collection('master-forms'); // master-formsコレクションを指定
+    const masterDocRef = masterCollectionRef.doc(formKey); // キーとして使用する識別子をドキュメントIDとして指定
+    await masterDocRef.update({
+        confirmation: confirmation // 確認画面の存在を保存
+    });
 }
 
-//フォーム入力過程の関数
+
 async function processOnInput(page) {
-await handleAgreementButton(page);
-const longestFormHTML = await extractFormHTML(page);
-if (longestFormHTML === undefined) {
-    console.log("Error: longestFormHTML is undefined.");
-    return;
-}
-if (longestFormHTML.length === 0) {
-    console.log("No form found. Exiting...");
-    return;
-}
-const { fields, submit } = analyzeFields(longestFormHTML);
+    const url = await page.url(); // 例: URLをキーとして使用
+    const formKey = generateDocumentId(url);
+    await handleAgreementButton(page);
+    const longestFormHTML = await extractFormHTML(page);
+    if (longestFormHTML === undefined) {
+        console.log("Error: longestFormHTML is undefined.");
+        return;
+    }
+    if (longestFormHTML.length === 0) {
+        console.log("No form found. Exiting...");
+        return;
+    }
+    const { fields, submit } = analyzeFields(longestFormHTML);
 
-const originalInquiryContent = dataToSend.inquiry_content;
-dataToSend.inquiry_content = dataToSend.inquiry_content.substring(0, 40);
-const promptContent = createMappingPrompt(fields, submit, dataToSend);
-const formData = await requestAndAnalyzeMapping(promptContent);
-formatAndLogFormData(formData, originalInquiryContent);
-await fillFormFields(page, formData, dataToSend, originalInquiryContent);
-await submitForm(page, formData);
+    const originalInquiryContent = dataToSend.inquiry_content;
+    dataToSend.inquiry_content = dataToSend.inquiry_content.substring(0, 40);
+    const promptContent = createMappingPrompt(fields, submit, dataToSend);
+    const formData = await requestAndAnalyzeMapping(promptContent);
+    formatAndLogFormData(formData, originalInquiryContent);
+    await fillFormFields(page, formData, dataToSend, originalInquiryContent);
+    await submitForm(page, formData);
+    // formDataからinquiry_contentを除外したオブジェクトを作成
+    const firestoreData = { ...formData };
+    delete firestoreData.inquiry_content;
+    // Firestoreへの保存部分
+    const masterCollectionRef = db.collection('master-forms'); // master-formsコレクションを指定
+    const masterDocRef = masterCollectionRef.doc(formKey); // キーとして使用する識別子をドキュメントIDとして指定
+    await masterDocRef.set({
+        key: formKey,
+        fieldsJsonString: JSON.stringify({ fields, submit }), // 元のフォームのフィールド
+        formData: JSON.stringify(firestoreData) // GPT-4が整形したフィールド
+    }); // データを保存
 
-return formData;
+    // 元のformDataをログ出力
+    console.log(`Document saved in master-forms with key: ${formKey}`, JSON.stringify(formData));
+
+    return formData;
 }
 
 //確認過程を処理する関数
@@ -290,6 +339,7 @@ function analyzeFields(longestFormHTML) {
     // HTMLからfieldsを作成
     const $ = cheerio.load(longestFormHTML);
     const fields = [];
+   
     
     const parseField = (el, type) => {
         const name = $(el).attr('name') || $(el).attr('id') || $(el).attr('class');
@@ -347,10 +397,9 @@ function analyzeFields(longestFormHTML) {
 //GPT-4でfieldsをマッピング
 function createMappingPrompt(fields, submit, dataToSend) {
     const resultJson = { fields, submit };
-    const fieldsJsonString = JSON.stringify(resultJson);
     const promptContent = `
 Analyze the following fields:
-${fieldsJsonString}
+${JSON.stringify(resultJson)}
 ・Standard field configuration:
 {"name": "Field name","value": "Field attribute name","type": "Field type","label": "Corresponding label"}
 
@@ -502,7 +551,7 @@ async function handleFieldInput(page, field, valueToSend) {
         // 他のタイプに対応する場合、ここに追加のケースを追加します
     }
         // 0.5秒から1秒のランダムな待機時間を追加
-    const milliseconds = Math.floor(Math.random() * 500) + 1000;
+    const milliseconds = Math.floor(Math.random() * 50) + 100;
     await new Promise(r => setTimeout(r, milliseconds));
 }
 
@@ -534,6 +583,7 @@ async function takeScreenshot(page, stage = '') {
     
 // 現在地を確認する主要な関数
 async function currentState(page, formData) {
+    console.log("formData in currentState:", JSON.stringify(formData, null, 2)); // ログ出力
     const cleanedHtmlTextContent = await cleanHtmlContent(page);
     const { isAllTextFieldsExist, isAnyTextFieldHiddenOrReadonly } = await checkTextFields(page, formData);
     const hasSubmitButton = await checkSubmitButton(page);
