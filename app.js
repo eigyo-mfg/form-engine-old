@@ -128,7 +128,6 @@ function generateDocumentId(url) {
     return url.replace(/\//g, '__');
 }
 
-
 async function mainProcess(page, timestamp) {
     let state = 'INPUT';
     let processOnInputTrial = 0;
@@ -202,22 +201,41 @@ async function saveResults(key, transformedUrl, timestamp, result) {
     console.log(`Document saved in results-forms with key: ${key}`);
 }
 
-
-async function processOnInput(page) {
-    const url = await page.url(); // 例: URLをキーとして使用
+// Firestoreからデータを取得し、一致するか確認する関数
+async function getMatchingDataFromFirestore(url, page) {
     const formKey = generateDocumentId(url);
+    const masterCollectionRef = db.collection('master-forms');
+    const masterDocRef = masterCollectionRef.doc(formKey);
+    const doc = await masterDocRef.get();
+
+    if (doc.exists) {
+        const data = doc.data();
+        if (data.key === formKey) {
+            const longestFormHTML = await extractFormHTML(page);
+            const { fields, submit } = analyzeFields(longestFormHTML);
+            const fieldsJsonString = JSON.stringify({ fields, submit });
+            if (data.fieldsJsonString === fieldsJsonString) {
+                return JSON.parse(data.formData);
+            }
+        }
+    }
+
+    return null;
+}
+
+// 通常の処理を行う関数
+async function normalProcessing(page) {
     await handleAgreementButton(page);
     const longestFormHTML = await extractFormHTML(page);
     if (longestFormHTML === undefined) {
         console.log("Error: longestFormHTML is undefined.");
-        return;
+        return null;
     }
     if (longestFormHTML.length === 0) {
         console.log("No form found. Exiting...");
-        return;
+        return null;
     }
     const { fields, submit } = analyzeFields(longestFormHTML);
-
     const originalInquiryContent = dataToSend.inquiry_content;
     dataToSend.inquiry_content = dataToSend.inquiry_content.substring(0, 40);
     const promptContent = createMappingPrompt(fields, submit, dataToSend);
@@ -225,9 +243,29 @@ async function processOnInput(page) {
     formatAndLogFormData(formData, originalInquiryContent);
     await fillFormFields(page, formData, dataToSend, originalInquiryContent);
     await submitForm(page, formData);
+    return { formData, fields, submit };
+}
+
+async function processOnInput(page) {
+    const url = await page.url();
+    const formKey = generateDocumentId(url);
+
+    // Firestoreからのデータ取得と一致確認
+    const matchingData = await getMatchingDataFromFirestore(url, page);
+    if (matchingData) {
+        await fillFormFields(page, matchingData, dataToSend, dataToSend.inquiry_content);
+        await submitForm(page, matchingData);
+        return matchingData;
+    }
+
+    // 通常の処理
+    const { formData, fields, submit } = await normalProcessing(page);
+    if (!formData) return null;
+
     // formDataからinquiry_contentを除外したオブジェクトを作成
     const firestoreData = { ...formData };
     delete firestoreData.inquiry_content;
+
     // Firestoreへの保存部分
     const masterCollectionRef = db.collection('master-forms'); // master-formsコレクションを指定
     const masterDocRef = masterCollectionRef.doc(formKey); // キーとして使用する識別子をドキュメントIDとして指定
@@ -242,6 +280,8 @@ async function processOnInput(page) {
 
     return formData;
 }
+
+
 
 //確認過程を処理する関数
 async function processOnConfirm(page) {
