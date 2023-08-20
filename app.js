@@ -12,37 +12,6 @@ const maxProcessOnInputTrials = 2;
 const maxTotalTrials = 5;
 const db = require('./firestore');
 
-// スプレッドシートのIDをここに入力
-const sheetId = '11wyDbzPIcTi4bS0lnuDJVrvUjgVKirzTKScsJ4iNZgc'; 
-
-//送りたい内容。プロジェクトごとに値は変更可能
-const dataToSend = {
-    "company_name": "営業製作所株式会社",
-    "contact_person": "安田　美佳",
-    "contact_person_kana": "やすだ　みか",
-    "last_name_kanji": "安田",
-    "first_name_kanji": "美佳",
-    "last_name_kana": "やすだ",
-    "first_name_kana": "みか",
-    "email": "m.yasuda@sales-bank.com",
-    "phone": "06-6136-8027",
-    "phone_area_code": "06",
-    "phone_prefix": "6136",
-    "phone_line_number": "8027",
-    "postal_code": "550-0002",
-    "postal_code_prefix": "550",
-    "postal_code_suffix": "0002",
-    "city":"大阪市",
-    "address": "大阪府大阪市西区江戸堀1-22-38　三洋ビル501",
-    "date_of_birth": "1992年4月14日",
-    "reply_method": "メール",
-    "department": "営業部",
-    "position": "主査",
-    "subject": "【製造業7,000名の担当者から廃材回収のニーズを頂戴しております】",
-    "inquiry_content": 
-    "代表者様 \nお世話になります。\n営業製作所の安田と申します。\n\n製造業の担当者7,000名から廃材回収に関するニーズを頂戴しております\n具体的なニーズの有無まで調査行い、ご紹介が可能ですのでご連絡させていただきました。\n\n弊社は、製造業に特化した事業を展開しており、 サービスリリース2年で500社の企業様にご活用いただいております。\n\n貴社の回収しやすい【材質】【大きさ】【形状】【重量】を満たす、取引先を発掘することが可能です。 \n同業他社での実績や貴社に合致したレポートをご用意しておりますので、ご興味をお持ち頂ける場合はお電話にて詳細をお伝えします。\n\n 下記メールアドレスにお電話可能な日時をお送りくださいませ。\n\n ■メールアドレス m.yasuda@sales-bank.com \n■弊社パンフレット https://tinyurl.com/239r55dc \nそれではご連絡お待ちしております。"
-};
-
 // Google Sheets APIの初期化
 const { google } = require('googleapis');
 const keys = require('./spread.json');
@@ -64,6 +33,37 @@ client.authorize(function (err, tokens) {
 });
 
 const gsapi = google.sheets({ version: 'v4', auth: client });
+
+// スプレッドシートのIDをここに入力
+const sheetId = '11wyDbzPIcTi4bS0lnuDJVrvUjgVKirzTKScsJ4iNZgc'; 
+
+// dataToSend変数の初期値を空のオブジェクトに設定
+let dataToSend = {};
+
+async function loadDataToSend() {
+    const request = {
+      spreadsheetId: sheetId,
+      range: 'input!A2:B24', // ここでは固定の範囲を指定していますが、動的に変更することも可能です
+    };
+  
+    let response = await gsapi.spreadsheets.values.get(request);
+    let rows = response.data.values;
+  
+    let data = {};
+    rows.forEach(row => {
+      let key = row[0];
+      let value = row[1];
+      data[key] = value;
+    });
+    return data;
+}
+  
+// この関数を呼び出して、dataToSend変数に値を設定します。
+loadDataToSend().then(data => {
+    dataToSend = data;
+    console.log('dataToSend:', dataToSend); 
+});
+
 
 //スプレッドシートからURLを取得
 async function getUrls() {
