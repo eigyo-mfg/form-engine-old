@@ -53,6 +53,9 @@ async function loadDataToSend() {
     rows.forEach(row => {
       let key = row[0];
       let value = row[1];
+      if (key === 'inquiry_content') {
+        value = value.replace(/\\n/g, '\n');
+      }
       data[key] = value;
     });
     return data;
@@ -61,7 +64,6 @@ async function loadDataToSend() {
 // この関数を呼び出して、dataToSend変数に値を設定します。
 loadDataToSend().then(data => {
     dataToSend = data;
-    console.log('dataToSend:', dataToSend); 
 });
 
 
