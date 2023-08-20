@@ -78,7 +78,7 @@ async function getUrls() {
 }
 
 // メインの非同期関数の定義
-async function run(url) {
+async function run(url, timestamp) {
     const browser = await puppeteer.launch({ headless: false });
     const page = await browser.newPage();
     await page.setRequestInterception(true);
@@ -92,7 +92,7 @@ async function run(url) {
         }
     });
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 10000 });
-    await mainProcess(page);
+    await mainProcess(page, timestamp); 
     await page.close();
     await browser.close();
 }
@@ -107,12 +107,13 @@ function chunkArray(array, size) {
 }
 
 async function main() {
+    const timestamp = new Date().toISOString();
     const urls = await getUrls();
     const chunks = chunkArray(urls, 3); // 3つのチャンクに分割
 
     for (const chunk of chunks) {
-        const promises = chunk.map(url => run(url)); // 各URLに対してrun関数を呼び出す
-        await Promise.all(promises); // 並列に実行
+        const promises = chunk.map(url => run(url, timestamp)); // タイムスタンプを渡す
+        await Promise.all(promises);
     }
 }
 main().catch(console.error);
@@ -127,13 +128,27 @@ function generateDocumentId(url) {
     return url.replace(/\//g, '__');
 }
 
-async function mainProcess(page) {
+async function saveResults(key, transformedUrl, timestamp) {
+    const resultsCollectionRef = db.collection('results-forms');
+    const resultsDocRef = resultsCollectionRef.doc(key);
+    await resultsDocRef.set({
+        key: key,
+        results: "ここに結果を入れる",
+        timestamp: timestamp, // 処理開始時のタイムスタンプ
+        url: transformedUrl
+    });
+    console.log(`Document saved in results-forms with key: ${key}`);
+}
+
+
+async function mainProcess(page, timestamp) {
     let state = 'INPUT';
     let processOnInputTrial = 0;
     let totalTrial = 0;
     let formData; // formDataを保存するための変数
     let confirmation = false; // 確認画面の存在をチェックする変数
     let formKey; // FirestoreのドキュメントIDを保存する変数
+    let initialUrl; // 初期URLを保存するための変数
 
     while (state !== 'DONE' && totalTrial < maxTotalTrials) {
         switch (state) {
@@ -142,6 +157,7 @@ async function mainProcess(page) {
                     processOnInputTrial++;
                     formData = await processOnInput(page); // formDataを受け取る
                     formKey = generateDocumentId(await page.url()); // ドキュメントIDを保存
+                    initialUrl = await page.url(); // 初期URLを保存
                 } else {
                     console.log("Max processOnInput trials reached, skipping...");
                 }
@@ -167,6 +183,15 @@ async function mainProcess(page) {
         }
     }
 
+    // mainProcessの最後で変換されたURLを取得
+    const transformedUrl = generateDocumentId(initialUrl);
+
+    // その変換されたURLとタイムスタンプを組み合わせてkeyを生成
+    const key = transformedUrl + timestamp;
+
+    // keyをsaveResults関数に渡す
+    await saveResults(key, transformedUrl, timestamp);
+
     // Firestoreへの追加データ保存部分
     const masterCollectionRef = db.collection('master-forms'); // master-formsコレクションを指定
     const masterDocRef = masterCollectionRef.doc(formKey); // キーとして使用する識別子をドキュメントIDとして指定
@@ -174,7 +199,6 @@ async function mainProcess(page) {
         confirmation: confirmation // 確認画面の存在を保存
     });
 }
-
 
 async function processOnInput(page) {
     const url = await page.url(); // 例: URLをキーとして使用
