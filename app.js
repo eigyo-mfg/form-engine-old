@@ -193,6 +193,7 @@ async function mainProcess(page, timestamp) {
     });
 }
 
+//実行結果を保存する関数
 async function saveResults(key, transformedUrl, timestamp, result) {
     const resultsCollectionRef = db.collection('results-forms');
     const resultsDocRef = resultsCollectionRef.doc(key);
@@ -203,7 +204,60 @@ async function saveResults(key, transformedUrl, timestamp, result) {
         url: transformedUrl
     });
     console.log(`Document saved in results-forms with key: ${key}`);
+
+    // スプレッドシートに結果を書き込む
+    await writeToSpreadsheet(transformedUrl, result, timestamp);
 }
+
+// スプレッドシートに結果と日時を書き込む関数
+async function writeToSpreadsheet(url, result, timestamp) {
+    const rowNumber = await getRowNumberForUrl(url); // URLに対応する行番号を取得
+    if (rowNumber === null) return; // 行が見つからない場合、処理を終了
+
+    const symbolMapping = {
+        "COMPLETE": "⚪︎",
+        "ERROR": "×",
+        "Not Exist": "-"
+    };
+
+    const symbol = symbolMapping[result] || "Unknown"; // 結果に対応する記号を取得
+    const date = new Date(timestamp).toLocaleString(); // タイムスタンプをローカル日時に変換
+
+    const updateRequest = {
+        spreadsheetId: sheetId,
+        range: `Sheet1!E${rowNumber}:F${rowNumber}`, // E列とF列の対応する行を指定
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+            values: [[symbol, date]] // 記号と日時を書き込む
+        }
+    };
+    await gsapi.spreadsheets.values.update(updateRequest);
+}
+
+// URLに対応する行番号を取得する関数
+async function getRowNumberForUrl(url) {
+    // ここでURLを変換
+    url = generateDocumentId(url);
+
+    const request = {
+        spreadsheetId: sheetId,
+        range: 'Sheet1!D2:D', // D列の2行目から最後までを指定
+    };
+
+    let response = await gsapi.spreadsheets.values.get(request);
+    let urls = response.data.values.flat();
+
+    // 変換されたURLが一致する行番号を見つける
+    const rowIndex = urls.findIndex(storedUrl => generateDocumentId(storedUrl) === url);
+
+    if (rowIndex === -1) {
+        console.log(`URL not found in the spreadsheet: ${url}`);
+        return null; // URLが見つからない場合、nullを返す
+    }
+
+    return rowIndex + 2; // 2行目から始まるので、インデックスに2を加える
+}
+
 
 // Firestoreからデータを取得し、一致するか確認する関数
 async function getMatchingDataFromFirestore(url, page) {
@@ -227,6 +281,7 @@ async function getMatchingDataFromFirestore(url, page) {
     return null;
 }
 
+//results-formsからurlにマッチする結果を探す関数
 async function getLatestResultForUrl(url) {
     // generateDocumentId関数を使用してURLを変換
     const transformedUrl = generateDocumentId(url);
@@ -235,7 +290,7 @@ async function getLatestResultForUrl(url) {
     const query = resultsCollectionRef.where('url', '==', transformedUrl).orderBy('timestamp', 'desc').limit(1);
     const querySnapshot = await query.get();
     if (querySnapshot.empty) {
-        return "Not Exist"; // データが存在しない場合
+        return "NONE"; // データが存在しない場合
     }
     const doc = querySnapshot.docs[0];
     return doc.data().results; // 最新の結果を返す
@@ -282,6 +337,10 @@ async function processOnInput(page) {
             }
             break;
         case "ERROR":
+            // 通常のGPT-4を含めた処理で実行
+            // 以下の通常処理に進む
+            break;
+        case "NONE":
             // 通常のGPT-4を含めた処理で実行
             // 以下の通常処理に進む
             break;
