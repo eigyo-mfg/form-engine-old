@@ -128,18 +128,6 @@ function generateDocumentId(url) {
     return url.replace(/\//g, '__');
 }
 
-async function saveResults(key, transformedUrl, timestamp) {
-    const resultsCollectionRef = db.collection('results-forms');
-    const resultsDocRef = resultsCollectionRef.doc(key);
-    await resultsDocRef.set({
-        key: key,
-        results: "ここに結果を入れる",
-        timestamp: timestamp, // 処理開始時のタイムスタンプ
-        url: transformedUrl
-    });
-    console.log(`Document saved in results-forms with key: ${key}`);
-}
-
 
 async function mainProcess(page, timestamp) {
     let state = 'INPUT';
@@ -149,6 +137,7 @@ async function mainProcess(page, timestamp) {
     let confirmation = false; // 確認画面の存在をチェックする変数
     let formKey; // FirestoreのドキュメントIDを保存する変数
     let initialUrl; // 初期URLを保存するための変数
+    let result = "ERROR"; // デフォルトの結果をERRORとして設定
 
     while (state !== 'DONE' && totalTrial < maxTotalTrials) {
         switch (state) {
@@ -167,6 +156,7 @@ async function mainProcess(page, timestamp) {
                 await processOnConfirm(page);
                 break;
             case 'COMPLETE':
+                result = "COMPLETE"; // 送信が完了した場合
                 await processOnComplete(page);
                 state = 'DONE'; 
                 continue; // この状態でループを再開する
@@ -190,7 +180,7 @@ async function mainProcess(page, timestamp) {
     const key = transformedUrl + timestamp;
 
     // keyをsaveResults関数に渡す
-    await saveResults(key, transformedUrl, timestamp);
+    await saveResults(key, transformedUrl, timestamp, result); // 結果も渡す
 
     // Firestoreへの追加データ保存部分
     const masterCollectionRef = db.collection('master-forms'); // master-formsコレクションを指定
@@ -199,6 +189,19 @@ async function mainProcess(page, timestamp) {
         confirmation: confirmation // 確認画面の存在を保存
     });
 }
+
+async function saveResults(key, transformedUrl, timestamp, result) {
+    const resultsCollectionRef = db.collection('results-forms');
+    const resultsDocRef = resultsCollectionRef.doc(key);
+    await resultsDocRef.set({
+        key: key,
+        results: result, // 結果を保存
+        timestamp: timestamp, // 処理開始時のタイムスタンプ
+        url: transformedUrl
+    });
+    console.log(`Document saved in results-forms with key: ${key}`);
+}
+
 
 async function processOnInput(page) {
     const url = await page.url(); // 例: URLをキーとして使用
