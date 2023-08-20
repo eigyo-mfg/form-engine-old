@@ -65,6 +65,7 @@ client.authorize(function (err, tokens) {
 
 const gsapi = google.sheets({ version: 'v4', auth: client });
 
+//スプレッドシートからURLを取得
 async function getUrls() {
     const request = {
       spreadsheetId: sheetId,
@@ -106,6 +107,7 @@ function chunkArray(array, size) {
     return result;
 }
 
+//並列処理を実行する関数チャンクはケースによって変更する
 async function main() {
     const timestamp = new Date().toISOString();
     const urls = await getUrls();
@@ -118,6 +120,7 @@ async function main() {
 }
 main().catch(console.error);
 
+//URLをFirestoreのデータとして扱えるように変換
 function generateDocumentId(url) {
     // URLの最後がスラッシュで終わっている場合、それを削除
     if (url.endsWith('/')) {
@@ -128,6 +131,7 @@ function generateDocumentId(url) {
     return url.replace(/\//g, '__');
 }
 
+//主要な処理をループして実行する関数
 async function mainProcess(page, timestamp) {
     let state = 'INPUT';
     let processOnInputTrial = 0;
@@ -223,6 +227,22 @@ async function getMatchingDataFromFirestore(url, page) {
     return null;
 }
 
+async function getLatestResultForUrl(url) {
+    // generateDocumentId関数を使用してURLを変換
+    const transformedUrl = generateDocumentId(url);
+
+    const resultsCollectionRef = db.collection('results-forms');
+    const query = resultsCollectionRef.where('url', '==', transformedUrl).orderBy('timestamp', 'desc').limit(1);
+    const querySnapshot = await query.get();
+    if (querySnapshot.empty) {
+        return "Not Exist"; // データが存在しない場合
+    }
+    const doc = querySnapshot.docs[0];
+    return doc.data().results; // 最新の結果を返す
+}
+
+
+
 // 通常の処理を行う関数
 async function normalProcessing(page) {
     await handleAgreementButton(page);
@@ -249,13 +269,26 @@ async function normalProcessing(page) {
 async function processOnInput(page) {
     const url = await page.url();
     const formKey = generateDocumentId(url);
-
-    // Firestoreからのデータ取得と一致確認
-    const matchingData = await getMatchingDataFromFirestore(url, page);
-    if (matchingData) {
-        await fillFormFields(page, matchingData, dataToSend, dataToSend.inquiry_content);
-        await submitForm(page, matchingData);
-        return matchingData;
+    // URLに対応する最新の結果を取得
+    const latestResult = await getLatestResultForUrl(url);
+    switch (latestResult) {
+        case "COMPLETE":
+            // Firestoreからのデータ取得と一致確認
+            const matchingData = await getMatchingDataFromFirestore(url, page);
+            if (matchingData) {
+                await fillFormFields(page, matchingData, dataToSend, dataToSend.inquiry_content);
+                await submitForm(page, matchingData);
+                return matchingData;
+            }
+            break;
+        case "ERROR":
+            // 通常のGPT-4を含めた処理で実行
+            // 以下の通常処理に進む
+            break;
+        case "Not Exist":
+            // 処理を実行しない
+            console.log("No matching result found. Exiting...");
+            return null;
     }
 
     // 通常の処理
@@ -274,13 +307,8 @@ async function processOnInput(page) {
         fieldsJsonString: JSON.stringify({ fields, submit }), // 元のフォームのフィールド
         formData: JSON.stringify(firestoreData) // GPT-4が整形したフィールド
     }); // データを保存
-
-    // 元のformDataをログ出力
-    console.log(`Document saved in master-forms with key: ${formKey}`, JSON.stringify(formData));
-
     return formData;
 }
-
 
 
 //確認過程を処理する関数
@@ -591,29 +619,24 @@ async function handleFieldInput(page, field, valueToSend) {
         case 'time':
         case 'url':
         case 'week':
-        console.log(`Field name: ${field.name}, value to send:`, valueToSend); 
         await page.type(`input[name="${field.value}"]`, valueToSend); // 値を入力
         break;
         case 'textarea':
             await page.type(`textarea[name="${field.value}"]`, valueToSend); // テキストエリアに値を入力
-            console.log(`Textarea filled: Field name: ${field.name}, value: ${valueToSend}`);
             break;
         case 'radio':
             const selectedRadioValue = field.values[0].selectValue; // 選択する値を取得
             await page.click(`input[name="${field.value}"][value="${selectedRadioValue}"]`); // ラジオボタンを選択
-            console.log(`Radio selected: Field name: ${field.name}, value: ${selectedRadioValue}`);
             break;
         case 'checkbox':
             const selectedCheckboxValue = field.values[0].selectValue; // 選択する値を取得
             if (selectedCheckboxValue) { // チェックボックスが選択されている場合
                 await page.click(`input[name="${field.value}"][value="${selectedCheckboxValue}"]`);
-                console.log(`Checkbox selected: Field name: ${field.name}, value: ${selectedCheckboxValue}`);
             }
             break;
         case 'select':
             const selectedSelectValue = field.values[0].selectValue; // 選択する値を取得
             await page.select(`select[name="${field.value}"]`, selectedSelectValue); // セレクトボックスを選択
-            console.log(`Select value chosen: Field name: ${field.name}, value: ${selectedSelectValue}`);
             break;
         // 他のタイプに対応する場合、ここに追加のケースを追加します
     }
@@ -650,7 +673,6 @@ async function takeScreenshot(page, stage = '') {
     
 // 現在地を確認する主要な関数
 async function currentState(page, formData) {
-    console.log("formData in currentState:", JSON.stringify(formData, null, 2)); // ログ出力
     const cleanedHtmlTextContent = await cleanHtmlContent(page);
     const { isAllTextFieldsExist, isAnyTextFieldHiddenOrReadonly } = await checkTextFields(page, formData);
     const hasSubmitButton = await checkSubmitButton(page);
