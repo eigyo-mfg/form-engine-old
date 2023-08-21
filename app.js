@@ -71,12 +71,15 @@ loadDataToSend().then(data => {
 async function getUrls() {
     const request = {
       spreadsheetId: sheetId,
-      range: 'Sheet1!D:D', // D列を指定
+      range: 'Sheet1!D2:E', // D列とE列を指定
     };
   
     let response = await gsapi.spreadsheets.values.get(request);
-    let urls = response.data.values.flat().slice(1);
-    console.log(urls); // この行を追加
+    let urls = response.data.values
+        .filter(row => !row[1]) // E列に値がないものだけをフィルタリング
+        .map(row => row[0]); // D列の値（URL）だけを取得
+
+    console.log(urls);
     return urls;
 }
 
@@ -149,7 +152,11 @@ async function mainProcess(page, timestamp) {
             case 'INPUT':
                 if (processOnInputTrial < maxProcessOnInputTrials) {
                     processOnInputTrial++;
-                    formData = await processOnInput(page); // formDataを受け取る
+                    formData = await processOnInput(page, timestamp);// formDataを受け取る
+                    if (formData === null) {
+                        console.log("Form not found. Exiting mainProcess...");
+                        return; // formDataがnullの場合、関数を終了
+                    }
                     formKey = generateDocumentId(await page.url()); // ドキュメントIDを保存
                     initialUrl = await page.url(); // 初期URLを保存
                 } else {
@@ -197,43 +204,51 @@ async function mainProcess(page, timestamp) {
 
 //実行結果を保存する関数
 async function saveResults(key, transformedUrl, timestamp, result) {
-    const resultsCollectionRef = db.collection('results-forms');
-    const resultsDocRef = resultsCollectionRef.doc(key);
-    await resultsDocRef.set({
-        key: key,
-        results: result, // 結果を保存
-        timestamp: timestamp, // 処理開始時のタイムスタンプ
-        url: transformedUrl
-    });
-    console.log(`Document saved in results-forms with key: ${key}`);
+    try {
+        const resultsCollectionRef = db.collection('results-forms');
+        const resultsDocRef = resultsCollectionRef.doc(key);
+        await resultsDocRef.set({
+            key: key,
+            results: result, // 結果を保存
+            timestamp: timestamp, // 処理開始時のタイムスタンプ
+            url: transformedUrl
+        });
+        console.log(`Document saved in results-forms with key: ${key}`);
 
-    // スプレッドシートに結果を書き込む
-    await writeToSpreadsheet(transformedUrl, result, timestamp);
+        // スプレッドシートに結果を書き込む
+        await writeToSpreadsheet(transformedUrl, result, timestamp);
+    } catch (error) {
+        console.error("Error writing to spreadsheet:", error);
+    }
 }
 
 // スプレッドシートに結果と日時を書き込む関数
 async function writeToSpreadsheet(url, result, timestamp) {
-    const rowNumber = await getRowNumberForUrl(url); // URLに対応する行番号を取得
-    if (rowNumber === null) return; // 行が見つからない場合、処理を終了
+    try {
+        const rowNumber = await getRowNumberForUrl(url); // URLに対応する行番号を取得
+        if (rowNumber === null) return; // 行が見つからない場合、処理を終了
 
-    const symbolMapping = {
-        "COMPLETE": "⚪︎",
-        "ERROR": "×",
-        "Not Exist": "-"
-    };
+        const symbolMapping = {
+            "COMPLETE": "⚪︎",
+            "ERROR": "×",
+            "Not Exist": "-"
+        };
 
-    const symbol = symbolMapping[result] || "Unknown"; // 結果に対応する記号を取得
-    const date = new Date(timestamp).toLocaleString(); // タイムスタンプをローカル日時に変換
+        const symbol = symbolMapping[result] || "Unknown"; // 結果に対応する記号を取得
+        const date = new Date(timestamp).toLocaleString(); // タイムスタンプをローカル日時に変換
 
-    const updateRequest = {
-        spreadsheetId: sheetId,
-        range: `Sheet1!E${rowNumber}:F${rowNumber}`, // E列とF列の対応する行を指定
-        valueInputOption: 'USER_ENTERED',
-        resource: {
-            values: [[symbol, date]] // 記号と日時を書き込む
-        }
-    };
-    await gsapi.spreadsheets.values.update(updateRequest);
+        const updateRequest = {
+            spreadsheetId: sheetId,
+            range: `Sheet1!E${rowNumber}:F${rowNumber}`, // E列とF列の対応する行を指定
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+                values: [[symbol, date]] // 記号と日時を書き込む
+            }
+        };
+        await gsapi.spreadsheets.values.update(updateRequest);
+    } catch (error) {
+        console.error("Error writing to spreadsheet:", error);
+    }
 }
 
 // URLに対応する行番号を取得する関数
@@ -271,7 +286,7 @@ async function getMatchingDataFromFirestore(url, page) {
     if (doc.exists) {
         const data = doc.data();
         if (data.key === formKey) {
-            const longestFormHTML = await extractFormHTML(page);
+            const longestFormHTML = await extractFormHTML(page, url);
             const { fields, submit } = analyzeFields(longestFormHTML);
             const fieldsJsonString = JSON.stringify({ fields, submit });
             if (data.fieldsJsonString === fieldsJsonString) {
@@ -287,23 +302,22 @@ async function getMatchingDataFromFirestore(url, page) {
 async function getLatestResultForUrl(url) {
     // generateDocumentId関数を使用してURLを変換
     const transformedUrl = generateDocumentId(url);
-
     const resultsCollectionRef = db.collection('results-forms');
     const query = resultsCollectionRef.where('url', '==', transformedUrl).orderBy('timestamp', 'desc').limit(1);
     const querySnapshot = await query.get();
+
     if (querySnapshot.empty) {
         return "NONE"; // データが存在しない場合
     }
     const doc = querySnapshot.docs[0];
-    return doc.data().results; // 最新の結果を返す
+    const resultData = doc.data().results;// 最新の結果を返す
+    return resultData;
 }
 
-
-
 // 通常の処理を行う関数
-async function normalProcessing(page) {
+async function normalProcessing(page, url) { 
     await handleAgreementButton(page);
-    const longestFormHTML = await extractFormHTML(page);
+    const longestFormHTML = await extractFormHTML(page, url);
     if (longestFormHTML === undefined) {
         console.log("Error: longestFormHTML is undefined.");
         return null;
@@ -323,8 +337,9 @@ async function normalProcessing(page) {
     return { formData, fields, submit };
 }
 
-async function processOnInput(page) {
+async function processOnInput(page, timestamp) { 
     const url = await page.url();
+    const transformedUrl = generateDocumentId(url);
     const formKey = generateDocumentId(url);
     // URLに対応する最新の結果を取得
     const latestResult = await getLatestResultForUrl(url);
@@ -339,22 +354,24 @@ async function processOnInput(page) {
             }
             break;
         case "ERROR":
-            // 通常のGPT-4を含めた処理で実行
-            // 以下の通常処理に進む
-            break;
         case "NONE":
-            // 通常のGPT-4を含めた処理で実行
-            // 以下の通常処理に進む
-            break;
+            break; // 通常の処理に進む
         case "Not Exist":
-            // 処理を実行しない
-            console.log("No matching result found. Exiting...");
-            return null;
+            console.log("form not exist");
+            return null; // フォームが存在しない場合、nullを返す
     }
 
     // 通常の処理
-    const { formData, fields, submit } = await normalProcessing(page);
-    if (!formData) return null;
+    const result = await normalProcessing(page, url); // result変数に結果を保存
+    if (result === null) {
+        console.log("No form found. Exiting processOnInput...");
+        const resultStatus = "Not Exist";
+        await saveResults(formKey, transformedUrl, timestamp, resultStatus); // 結果を"Not Exist"として保存
+        await writeToSpreadsheet(transformedUrl, resultStatus, timestamp); // スプレッドシートに"-"を書き込む
+        return null;
+    }
+
+    const { formData, fields, submit } = result; // resultから値を分割代入
 
     // formDataからinquiry_contentを除外したオブジェクトを作成
     const firestoreData = { ...formData };
@@ -370,6 +387,7 @@ async function processOnInput(page) {
     }); // データを保存
     return formData;
 }
+
 
 
 //確認過程を処理する関数
@@ -425,7 +443,7 @@ async function handleAgreementButton(page) {
 }
 
 //formのHTMLを抜き出す関数
-async function extractFormHTML(page) {
+async function extractFormHTML(page, url) {
     // formタグを抽出
     const html = await page.content();
     let $ = cheerio.load(html);
