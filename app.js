@@ -328,14 +328,15 @@ async function normalProcessing(page, url) {
     }
     const { fields, submit } = analyzeFields(longestFormHTML);
     const originalInquiryContent = dataToSend.inquiry_content;
-    dataToSend.inquiry_content = dataToSend.inquiry_content.substring(0, 40);
-    const promptContent = createMappingPrompt(fields, submit, dataToSend);
+    const shortenedInquiryContent = originalInquiryContent.substring(0, 40);
+    const promptContent = createMappingPrompt(fields, submit, { ...dataToSend, inquiry_content: shortenedInquiryContent });
     const formData = await requestAndAnalyzeMapping(promptContent);
     formatAndLogFormData(formData, originalInquiryContent);
     await fillFormFields(page, formData, dataToSend, originalInquiryContent);
     await submitForm(page, formData);
     return { formData, fields, submit };
 }
+
 
 async function processOnInput(page, timestamp) { 
     const url = await page.url();
@@ -688,7 +689,17 @@ async function fillFormFields(page, formData, dataToSend, originalInquiryContent
 
 //フィールドごとに入力処理を行う関数
 async function handleFieldInput(page, field, valueToSend) {
-    switch (field.type) {              
+    console.log("Field type:", field.type);
+    const selector = getSelector(field); // セレクタを取得
+    console.log("Selector:", selector);
+
+    // セレクタがnullの場合、処理をスキップ
+    if (selector === null) {
+        console.warn("No selector found for field:", field);
+        return;
+    }
+
+    switch (field.type) {
         case 'text':
         case 'email':
         case 'date':
@@ -698,10 +709,17 @@ async function handleFieldInput(page, field, valueToSend) {
         case 'time':
         case 'url':
         case 'week':
-        await page.type(`input[name="${field.value}"]`, valueToSend); // 値を入力
-        break;
+            const currentValue = await page.$eval(selector, el => el.value); // 現在の値を取得
+            // 現在の値が送信する値と同じであればスキップ
+            if (currentValue === valueToSend) {
+                return;
+            }
+            await page.type(selector, valueToSend); // 値を入力
+            break;
         case 'textarea':
-            await page.type(`textarea[name="${field.value}"]`, valueToSend); // テキストエリアに値を入力
+            await page.focus(selector); // テキストエリアにフォーカスを当てる
+            await page.$eval(selector, el => el.value = ''); // 現在の値をクリア
+            await page.type(selector, valueToSend); // 新しい値を入力
             break;
         case 'radio':
             const selectedRadioValue = field.values[0].selectValue; // 選択する値を取得
@@ -719,10 +737,39 @@ async function handleFieldInput(page, field, valueToSend) {
             break;
         // 他のタイプに対応する場合、ここに追加のケースを追加します
     }
-        // 0.5秒から1秒のランダムな待機時間を追加
-    const milliseconds = Math.floor(Math.random() * 50) + 100;
+    // 3秒から5秒のランダムな待機時間を追加
+    const milliseconds = Math.floor(Math.random() * 3000) + 2000;
     await new Promise(r => setTimeout(r, milliseconds));
 }
+
+
+// セレクタを取得する関数
+function getSelector(field) {
+    switch (field.type) {
+        case 'text':
+        case 'email':
+        case 'date':
+        case 'month':
+        case 'number':
+        case 'tel':
+        case 'time':
+        case 'url':
+        case 'week':
+            return `input[name="${field.value}"]`;
+        case 'textarea':
+            return `textarea[name="${field.value}"]`;
+        case 'select':
+            return `select[name="${field.value}"]`;
+        case 'radio':
+            return `input[name="${field.value}"]`; // ラジオボタンのセレクタを返す
+        case 'checkbox':
+            return `input[name="${field.value}"]`; // チェックボックスのセレクタを返す
+        // 他のタイプに対応する場合、ここに追加のケースを追加します
+        default:
+            return null;
+    }
+}
+
 
 //フォームの送信処理を行う関数
 async function submitForm(page, formData) {
