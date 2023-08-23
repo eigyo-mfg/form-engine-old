@@ -135,6 +135,7 @@ async function mainProcess(page, timestamp) {
     let formKey; // FirestoreのドキュメントIDを保存する変数
     let initialUrl = await page.url(); // 初期URLを保存
     let result = "ERROR"; // デフォルトの結果をERRORとして設定
+    let promptContent; // プロンプトの内容を保存するための変数
 
     while (state !== 'DONE' && totalTrial < maxTotalTrials) {
         switch (state) {
@@ -142,7 +143,8 @@ async function mainProcess(page, timestamp) {
                 if (processOnInputTrial < maxProcessOnInputTrials) {
                     processOnInputTrial++;
                     const result = await processOnInput(page, timestamp); // formDataを受け取る
-                    const formData =result.formData;
+                    formData =result.formData;
+                    promptContent = result.promptContent; 
                     if (formData === null) {
                         console.log("Form not found. Exiting mainProcess...");
                         return; // responseがnullの場合、関数を終了
@@ -184,12 +186,14 @@ async function mainProcess(page, timestamp) {
 
     // mainProcessの最後で変換されたURLを取得
     const transformedUrl = generateDocumentId(initialUrl);
-
     // その変換されたURLとタイムスタンプを組み合わせてkeyを生成
     const key = transformedUrl + timestamp;
 
+    if (promptContent === undefined) {
+        promptContent = "none"; 
+    }
     // keyをsaveResults関数に渡す
-    await saveResults(key, transformedUrl, timestamp, result); // 結果も渡す
+    await saveResults(key, initialUrl, transformedUrl, timestamp, result, promptContent, formData); 
 
     // Firestoreへの追加データ保存部分
     const masterCollectionRef = db.collection('master-forms'); // master-formsコレクションを指定
@@ -214,7 +218,7 @@ async function processOnInput(page, timestamp) {
             if (matchingData) {
                 await fillFormFields(page, matchingData, dataToSend, dataToSend.inquiry_content);
                 await submitForm(page, matchingData);
-                return matchingData;
+                return { formData: matchingData }; 
             }
             break;
         case "ERROR":
@@ -235,8 +239,7 @@ async function processOnInput(page, timestamp) {
         return null;
     }
 
-    const { formData, fields, submit, submitResult} = result; // resultから値を分割代入
-
+    const { formData, fields, submit, submitResult , promptContent} = result; // resultから値を分割代入
     // formDataからinquiry_contentを除外したオブジェクトを作成
     const firestoreData = { ...formData };
     delete firestoreData.inquiry_content;
@@ -249,7 +252,7 @@ async function processOnInput(page, timestamp) {
         fieldsJsonString: JSON.stringify({ fields, submit }), // 元のフォームのフィールド
         formData: JSON.stringify(firestoreData) // GPT-4が整形したフィールド
     }); // データを保存
-    return {formData , submitResult};
+    return {formData , submitResult , promptContent};
 }
 
 // GPT-4を活用した、通常の処理を行う関数
@@ -273,7 +276,7 @@ async function normalProcessing(page, url) {
     formatAndLogFormData(formData, originalInquiryContent);
     await fillFormFields(page, formData, dataToSend, originalInquiryContent);
     const submitResult = await submitForm(page, formData);
-    return { formData, fields, submit, submitResult };
+    return { formData, fields, submit, submitResult ,promptContent};
 }
 
 //URLをFirestoreのデータとして扱えるように変換
@@ -292,15 +295,19 @@ function generateDocumentId(url) {
 }
 
 //実行結果を保存する関数
-async function saveResults(key, transformedUrl, timestamp, result) {
+async function saveResults(key, initialUrl ,transformedUrl, timestamp, result,promptContent, formData) {
     try {
+        const firestoreData = { ...formData };
+        delete firestoreData.inquiry_content;
         const resultsCollectionRef = db.collection('results-forms');
         const resultsDocRef = resultsCollectionRef.doc(key);
         await resultsDocRef.set({
             key: key,
             results: result, // 結果を保存
             timestamp: timestamp, // 処理開始時のタイムスタンプ
-            url: transformedUrl
+            url: initialUrl,
+            promptContent: promptContent, // プロンプトの内容を保存
+            formData: JSON.stringify(firestoreData) // formDataを保存
         });
         console.log(`Document saved in results-forms with key: ${key}`);
 
@@ -747,7 +754,7 @@ async function handleFieldInput(page, field, valueToSend) {
         // 他のタイプに対応する場合、ここに追加のケースを追加します
     }
     // 3秒から5秒のランダムな待機時間を追加
-    const milliseconds = Math.floor(Math.random() * 3000) + 2000;
+    const milliseconds = Math.floor(Math.random() * 100) + 500;
     await new Promise(r => setTimeout(r, milliseconds));
 }
 
@@ -787,48 +794,41 @@ async function submitForm(page, formData) {
     await page.setViewport({ width: 800, height: 600 });
     await new Promise(r => setTimeout(r, 1000));
 
-    try {
-        // submitボタンをクリック
-        await page.click(formData.submit);
-        console.log(formData.submit);
+    // submitボタンをクリック
+    await page.click(formData.submit);
+    console.log(formData.submit);
 
-        // Contact Form 7の送信完了を検知するセレクター
-        const contactForm7CompleteSelector = '.wpcf7-mail-sent-ok'; // 送信完了のセレクター
-        const responseOutputSelector = '.wpcf7-response-output'; // 送信結果のセレクター
+    // Contact Form 7の送信完了を検知するセレクター
+    const contactForm7CompleteSelector = '.wpcf7-mail-sent-ok'; // 送信完了のセレクター
+    const responseOutputSelector = '.wpcf7-response-output'; // 送信結果のセレクター
 
-        // ページ遷移と送信完了の検知
-        const navigationPromise = page.waitForNavigation({ timeout: 5000 }); // 5秒でページ遷移を待つ
-        const completePromise = page.waitForSelector(contactForm7CompleteSelector, { timeout: 5000 }); // 5秒で送信完了を待つ
-        const responsePromise = page.waitForSelector(responseOutputSelector, { timeout: 5000 }); // 5秒で送信結果を待つ
+    // タイムアウトを設定
+    const timeoutPromise = new Promise(resolve => setTimeout(resolve, 5000));
 
-        await Promise.race([navigationPromise, completePromise, responsePromise]);
+    // ページ遷移と送信完了の検知
+    const completePromise = page.waitForSelector(contactForm7CompleteSelector, { timeout: 5000 });
+    const responsePromise = page.waitForSelector(responseOutputSelector, { timeout: 5000 });
 
-        // ページ遷移が最初に発生した場合、何も返さずに関数を終了
-        if (await navigationPromise) {
-            return;
-        }
+    // タイムアウト、送信完了、送信結果のいずれかが発生するまで待つ
+    await Promise.race([timeoutPromise, completePromise, responsePromise]);
 
-        // 送信完了を確認
-        const isComplete = await page.$(contactForm7CompleteSelector);
-        if (isComplete) {
-            return "COMPLETE"; // 送信完了が検知された場合
-        }
-
-        // 送信結果のテキストを確認
-        const responseElement = await page.$(responseOutputSelector);
-        if (responseElement) {
-            const textContent = await page.evaluate(el => el.textContent, responseElement);
-            if (textContent.includes('有難う') || textContent.includes('有り難う') || textContent.includes('有りがとう') || textContent.includes('ありがとう') || textContent.includes('完了') || textContent.includes('Thank You')) {
-                return "COMPLETE"; // 送信完了と判断
-            }
-        }
-    } catch (error) {
-        console.error("Submit button not found or timeout reached:", error);
-        return "ERROR"; // エラーが発生した場合には、"ERROR"を返す
+    // 送信完了を確認
+    const isComplete = await page.$(contactForm7CompleteSelector);
+    if (isComplete) {
+        return "COMPLETE";
     }
+
+    // 送信結果のテキストを確認
+    const responseElement = await page.$(responseOutputSelector);
+    if (responseElement) {
+        const textContent = await page.evaluate(el => el.textContent, responseElement);
+        if (textContent.includes('有難う') || textContent.includes('有り難う') || textContent.includes('有りがとう') || textContent.includes('ありがとう') || textContent.includes('完了') || textContent.includes('Thank You')) {
+            return "COMPLETE";
+        }
+    }
+    // タイムアウトが発生した場合、または送信完了セレクターまたは送信結果セレクターが見つからなかった場合、何も返さずに関数を終了
 }
-
-
+    
 //スクリーンショットの関数
 async function takeScreenshot(page, stage = '') {
     const bodyHandle = await page.$('body');
@@ -846,6 +846,7 @@ async function takeScreenshot(page, stage = '') {
     
 // 現在地を確認する主要な関数
 async function currentState(page, formData) {
+    console.log("formData in currentState:", formData); 
     const cleanedHtmlTextContent = await cleanHtmlContent(page);
     const { isAllTextFieldsExist, isAnyTextFieldHiddenOrReadonly } = await checkTextFields(page, formData);
     const hasSubmitButton = await checkSubmitButton(page);
@@ -855,16 +856,29 @@ async function currentState(page, formData) {
 
 // HTMLコンテンツのクリーニング
 async function cleanHtmlContent(page) {
-    await page.waitForSelector('body', { timeout: 30000 });
     const bodyHandle = await page.$('body');
-    const htmlTextContent = await page.evaluate(body => body.textContent, bodyHandle);
-    await bodyHandle.dispose();
+    const htmlTextContent = await page.evaluate(body => {
+        // スクリプトタグを取得
+        const scriptTags = body.querySelectorAll('script');
+        
+        // スクリプトタグの内容を空にする
+        scriptTags.forEach(script => {
+        script.textContent = '';
+        });
 
+        // その後、残りのテキストコンテンツを取得
+        return body.textContent;
+    }, bodyHandle);
+  
+    await bodyHandle.dispose();
+  
     return htmlTextContent
-        .replace(/\s+/g, ' ')
-        .replace(/\n+/g, ' ')
-        .trim();
+      .replace(/\s+/g, ' ')
+      .replace(/\n+/g, ' ')
+      .trim();
 }
+  
+  
 
 // テキストフィールドのチェック
 async function checkTextFields(page, formData) {
