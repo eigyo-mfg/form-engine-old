@@ -44,7 +44,7 @@ let dataToSend = {};
 async function loadDataToSend() {
     const request = {
       spreadsheetId: sheetId,
-      range: 'input!A2:B25', // ここでは固定の範囲を指定していますが、動的に変更することも可能です
+      range: 'input!A2:B26', // ここでは固定の範囲を指定していますが、動的に変更することも可能です
     };
   
     let response = await gsapi.spreadsheets.values.get(request);
@@ -533,6 +533,7 @@ function analyzeFields(longestFormHTML) {
     const parseField = (el, type) => {
         const name = $(el).attr('name') || $(el).attr('id') || $(el).attr('class');
         const value = name;
+        const placeholder = $(el).attr('placeholder') || '';
         // ①labelとinput等が親子関係になく、forとidで関連付けの場合
         let label = $(`label[for="${name}"]`).text() || $(`label[for="${$(el).attr('id')}"]`).text() || '';
         // ②labelとinput等が親子関係の場合
@@ -549,7 +550,7 @@ function analyzeFields(longestFormHTML) {
                 fields.push({ name: value, value: name, type: type, values: [{ selectValue: selectValue, label: label }] }); // キー名を selectValue に変更
             }
         } else {
-            fields.push({ name: value, value: name, type: type, label: label });
+            fields.push({ name: value, value: name, type: type, label: label, placeholder: placeholder });
         }
     };
                       
@@ -576,9 +577,9 @@ function analyzeFields(longestFormHTML) {
     });
     
     // submit button
-
     const submitButton = $('button[type="submit"], input[type="submit"]');
     const submitButtonClass = submitButton.attr('class');
+    const submitButtonValue = submitButton.attr('value'); // value属性を取得
     const submitButtonName = submitButton.attr('name');
     const submitType = submitButtonName ? ($(`input[name="${submitButtonName}"]`).length > 0 ? 'input' : 'button') : (submitButton.is('button') ? 'button' : 'input');
     const submit = submitButtonClass ? `${submitType}.${submitButtonClass.split(' ').join('.')}[type="submit"]` : `${submitType}[type="submit"]`;
@@ -619,7 +620,7 @@ Analyze the above fields and data (dataToSend), and create a mapping between the
 - For "selectValue", consider the contents of "label" and "dataToSend", and select it as an inquiry for sales purposes without hindrance.
 - If you are unsure which to select, you must choose the last selectValue" within values to ensure submission.
 
-3. You must not change the submit button's selector.
+3. You must select one button to send from the submit button's selector.
 
 You must provide the analysis result in the following JSON format:
 {
@@ -636,6 +637,7 @@ Note:
 - You must always remove the "label" in the JSON format you provide.
 - It is not necessary to use all the content in dataToSend, you must only map what's relevant.
 - "inquiry_content" must match one "Field attribute name"
+- You must remove the placeholders in your reply.
 `;              
 return promptContent;
 }    
