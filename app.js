@@ -44,7 +44,7 @@ let dataToSend = {};
 async function loadDataToSend() {
     const request = {
       spreadsheetId: sheetId,
-      range: 'input!A2:B26', // ここでは固定の範囲を指定していますが、動的に変更することも可能です
+      range: 'input!A2:B27', // ここでは固定の範囲を指定していますが、動的に変更することも可能です
     };
   
     let response = await gsapi.spreadsheets.values.get(request);
@@ -756,7 +756,7 @@ async function handleFieldInput(page, field, valueToSend) {
         // 他のタイプに対応する場合、ここに追加のケースを追加します
     }
     // 3秒から5秒のランダムな待機時間を追加
-    const milliseconds = Math.floor(Math.random() * 100) + 500;
+    const milliseconds = Math.floor(Math.random() * 3000) + 2000;
     await new Promise(r => setTimeout(r, milliseconds));
 }
 
@@ -800,19 +800,21 @@ async function submitForm(page, formData) {
     await page.click(formData.submit);
     console.log(formData.submit);
 
-    // Contact Form 7の送信完了を検知するセレクター
-    const contactForm7CompleteSelector = '.wpcf7-mail-sent-ok'; // 送信完了のセレクター
-    const responseOutputSelector = '.wpcf7-response-output'; // 送信結果のセレクター
+    // 送信完了を検知するセレクター
+    const contactForm7CompleteSelector = '.wpcf7-mail-sent-ok';
+    const responseOutputSelector = '.wpcf7-response-output';
+    const screenReaderResponseSelector = '.screen-reader-response p[role="status"]'; // 新しいセレクター
 
     // タイムアウトを設定
-    const timeoutPromise = new Promise(resolve => setTimeout(resolve, 5000));
+    const timeoutPromise = new Promise(resolve => setTimeout(resolve, 10000));
 
     // ページ遷移と送信完了の検知
     const completePromise = page.waitForSelector(contactForm7CompleteSelector, { timeout: 5000 });
     const responsePromise = page.waitForSelector(responseOutputSelector, { timeout: 5000 });
+    const newCompletePromise = page.waitForSelector(screenReaderResponseSelector, { timeout: 5000 }); // 新しいPromise
 
     // タイムアウト、送信完了、送信結果のいずれかが発生するまで待つ
-    await Promise.race([timeoutPromise, completePromise, responsePromise]);
+    await Promise.race([timeoutPromise, completePromise, responsePromise, newCompletePromise]);
 
     // 送信完了を確認
     const isComplete = await page.$(contactForm7CompleteSelector);
@@ -820,11 +822,20 @@ async function submitForm(page, formData) {
         return "COMPLETE";
     }
 
-    // 送信結果のテキストを確認
+    // 送信結果のテキストを確認（既存のセレクター）
     const responseElement = await page.$(responseOutputSelector);
     if (responseElement) {
         const textContent = await page.evaluate(el => el.textContent, responseElement);
         if (textContent.includes('有難う') || textContent.includes('有り難う') || textContent.includes('有りがとう') || textContent.includes('ありがとう') || textContent.includes('完了') || textContent.includes('Thank You')) {
+            return "COMPLETE";
+        }
+    }
+
+    // 送信結果のテキストを確認（新しいセレクター）
+    const newResponseElement = await page.$(screenReaderResponseSelector);
+    if (newResponseElement) {
+        const newTextContent = await page.evaluate(el => el.textContent, newResponseElement);
+        if (newTextContent.includes('有難う') || newTextContent.includes('有り難う') || newTextContent.includes('有りがとう') || newTextContent.includes('ありがとう') || newTextContent.includes('Thank You')) {
             return "COMPLETE";
         }
     }
