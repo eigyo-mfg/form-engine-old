@@ -524,67 +524,76 @@ async function extractFormHTML(page, url) {
 }
 
 //cheerioで解析後fieldsを生成
-function analyzeFields(longestFormHTML) { 
-    // HTMLからfieldsを作成
+function analyzeFields(longestFormHTML) {
     const $ = cheerio.load(longestFormHTML);
     const fields = [];
-   
-    
+
     const parseField = (el, type) => {
         const name = $(el).attr('name') || $(el).attr('id') || $(el).attr('class');
         const value = name;
         const placeholder = $(el).attr('placeholder') || '';
-        // ①labelとinput等が親子関係になく、forとidで関連付けの場合
+        let additionalInfo = $(el).next().text() || '';
+        if (!additionalInfo) {
+            additionalInfo = $(el).parent().children().first().next().text() || '';
+        }
+        if (!additionalInfo) {
+            additionalInfo = $(el).parent().children().first().next().next().text() || '';
+        }
         let label = $(`label[for="${name}"]`).text() || $(`label[for="${$(el).attr('id')}"]`).text() || '';
-        // ②labelとinput等が親子関係の場合
         if (label === '') {
             label = $(el).parent('label').text() || '';
         }
-    
+
+        const field = { name: value, value: name, type: type };
+
+        if (label) field.label = label;
+        if (placeholder) field.placeholder = placeholder;
+        if (additionalInfo) field.additionalInfo = additionalInfo;
+
         if (type === "radio" || type === "checkbox") {
             const selectValue = $(el).attr('value');
             const existingField = fields.find(field => field.name === value && field.type === type);
             if (existingField) {
-                existingField.values.push({ selectValue: selectValue, label: label }); // キー名を selectValue に変更
+                existingField.values.push({ selectValue: selectValue, label: label });
             } else {
-                fields.push({ name: value, value: name, type: type, values: [{ selectValue: selectValue, label: label }] }); // キー名を selectValue に変更
+                field.values = [{ selectValue: selectValue, label: label }];
+                fields.push(field);
             }
         } else {
-            fields.push({ name: value, value: name, type: type, label: label, placeholder: placeholder });
+            fields.push(field);
         }
     };
-                      
-    // input fields
+
     $('input[type="text"], input[type="email"], input[type="date"], input[type="month"], input[type="number"], input[type="tel"], input[type="time"], input[type="url"], input[type="week"], textarea').each(function() {
         parseField(this, $(this).attr('type') || 'textarea');
     });
-    
-    // radio and checkbox fields
+
     $('input[type="radio"], input[type="checkbox"]').each(function() {
         parseField(this, $(this).attr('type'));
     });
-    
-    // select fields
+
     $('select').each(function() {
         const name = $(this).attr('name') || $(this).attr('id') || $(this).attr('class');
         const value = name;
         const type = 'select';
         const values = [];
         $(this).find('option').each(function() {
-            values.push({ selectValue: $(this).attr('value') }); // キー名を selectValue に変更
+            values.push({ selectValue: $(this).attr('value') });
         });
         fields.push({ name: value, value: name, type: type, values: values });
     });
-    
-    // submit button
+
     const submitButton = $('button[type="submit"], input[type="submit"]');
     const submitButtonClass = submitButton.attr('class');
     const submitButtonValue = submitButton.attr('value'); // value属性を取得
     const submitButtonName = submitButton.attr('name');
     const submitType = submitButtonName ? ($(`input[name="${submitButtonName}"]`).length > 0 ? 'input' : 'button') : (submitButton.is('button') ? 'button' : 'input');
     const submit = submitButtonClass ? `${submitType}.${submitButtonClass.split(' ').join('.')}[type="submit"]` : `${submitType}[type="submit"]`;
+
     return { fields, submit };
 }
+
+
 
 //GPT-4でfieldsをマッピング
 function createMappingPrompt(fields, submit, dataToSend) {
@@ -634,10 +643,9 @@ You must provide the analysis result in the following JSON format:
 Note:
 - You must not change the original "Field attribute name","Field type".
 - The following fields is in Japanese.
-- You must always remove the "label" in the JSON format you provide.
+- You must always remove the "label" and the "placeholder" and the "additionalInfo "in the JSON format you provide.
 - It is not necessary to use all the content in dataToSend, you must only map what's relevant.
 - "inquiry_content" must match one "Field attribute name"
-- You must remove the placeholders in your reply.
 `;              
 return promptContent;
 }    
@@ -809,9 +817,9 @@ async function submitForm(page, formData) {
     const timeoutPromise = new Promise(resolve => setTimeout(resolve, 10000));
 
     // ページ遷移と送信完了の検知
-    const completePromise = page.waitForSelector(contactForm7CompleteSelector, { timeout: 5000 });
-    const responsePromise = page.waitForSelector(responseOutputSelector, { timeout: 5000 });
-    const newCompletePromise = page.waitForSelector(screenReaderResponseSelector, { timeout: 5000 }); // 新しいPromise
+    const completePromise = page.waitForSelector(contactForm7CompleteSelector, { timeout: 10000 });
+    const responsePromise = page.waitForSelector(responseOutputSelector, { timeout: 10000 });
+    const newCompletePromise = page.waitForSelector(screenReaderResponseSelector, { timeout: 10000 });    
 
     // タイムアウト、送信完了、送信結果のいずれかが発生するまで待つ
     await Promise.race([timeoutPromise, completePromise, responsePromise, newCompletePromise]);
