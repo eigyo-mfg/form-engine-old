@@ -405,23 +405,55 @@ async function getLatestResultForUrl(url) {
     return resultData;
 }
 
-
-//確認過程を処理する関数
+// 確認過程を処理する関数
 async function processOnConfirm(page) {
-    const buttons = await page.$$('button, input[type="submit"]'); // button要素とinput type="submit"要素を取得
-    for (const button of buttons) {
-        const buttonText = await page.evaluate(el => el.textContent || el.value, button); // ボタンのテキスト内容またはvalue属性を取得
-        if (buttonText.includes('送信') || buttonText.includes('内容') || buttonText.includes('確認')) {
-            //スクリーンショット撮る
-            await takeScreenshot(page, 'confirm');
-            
-            const navigationPromise = page.waitForNavigation({ timeout: 10000 });
-            await button.click();
-            await navigationPromise; // ページの遷移を待つ
-            break; // 最初に見つかったボタンをクリックした後、ループを抜ける
+    console.log("Starting processOnConfirm function");
+
+    try {
+        await page.waitForSelector('input[type="submit"], button[type="submit"]', { timeout: 10000 });
+        console.log("Wait for selectors completed");
+
+        const currentURL = page.url();
+        console.log(`Current URL before clicking: ${currentURL}`);
+
+        const buttons = await page.$$('button, input[type="submit"]');
+        console.log(`Found ${buttons.length} buttons`);
+
+        for (const button of buttons) {
+            const buttonText = await page.evaluate(el => el.textContent || el.value, button);
+            const onClickAttribute = await page.evaluate(el => el.getAttribute('onclick'), button);
+            const isDisabled = await page.evaluate(el => el.disabled, button);
+            console.log(`Button Text: ${buttonText}, OnClick Attribute: ${onClickAttribute}, Is button disabled? ${isDisabled}`);
+
+            if (buttonText.includes('送') || buttonText.includes('内容') || buttonText.includes('確認')) {
+                console.log("Matching button found. Taking screenshot...");
+                await takeScreenshot(page, 'confirm');
+
+                const navigationPromise = page.waitForNavigation({ timeout: 10000 });
+
+                if (onClickAttribute) {
+                    console.log("Executing JavaScript click event");
+                    await page.evaluate(el => el.click(), button);  // ボタン要素をクリック
+                } else {
+                    console.log("Performing normal click");
+                    await button.click();
+                }
+
+                await navigationPromise;
+                console.log("Navigation completed");
+                break;
+            }
         }
+    } catch (error) {
+        console.log(`An error occurred: ${error.message}`);
+        // ここでエラーハンドリングの処理を追加することができます（例：リトライ、ログを送信する等）
     }
+
+    console.log("Ending processOnConfirm function");
 }
+
+
+
 
 //エラー過程を処理する関数
 async function processOnError(page) {
@@ -523,7 +555,6 @@ async function extractFormHTML(page, url) {
     return longestFormHTML; // 最長のフォームHTMLを返す
 }
 
-//cheerioで解析後fieldsを生成
 function analyzeFields(longestFormHTML) {
     const $ = cheerio.load(longestFormHTML);
     const fields = [];
@@ -532,13 +563,28 @@ function analyzeFields(longestFormHTML) {
         const name = $(el).attr('name') || $(el).attr('id') || $(el).attr('class');
         const value = name;
         const placeholder = $(el).attr('placeholder') || '';
-        let additionalInfo = $(el).next().text() || '';
+
+        let additionalInfo = $(el).next('small').text().trim() || '';
         if (!additionalInfo) {
-            additionalInfo = $(el).parent().children().first().next().text() || '';
+            additionalInfo = $(el).next('span').text().trim() || '';
         }
         if (!additionalInfo) {
-            additionalInfo = $(el).parent().children().first().next().next().text() || '';
+            additionalInfo = $(el).parent().find('small').text().trim() || '';
         }
+        if (!additionalInfo) {
+            additionalInfo = $(el).closest('.item-input').find('.small-txt').text().trim() || '';
+        }
+        if (!additionalInfo) {
+            let parentText = $(el).closest('.item-input').text().trim();
+            let selfText = '';
+            if ($(el).val() !== undefined) {
+                selfText = $(el).val().trim();
+            } else if ($(el).attr('placeholder') !== undefined) {
+                selfText = $(el).attr('placeholder').trim();
+            }
+            additionalInfo = parentText.replace(selfText, '').trim();
+        }           
+
         let label = $(`label[for="${name}"]`).text() || $(`label[for="${$(el).attr('id')}"]`).text() || '';
         if (label === '') {
             label = $(el).parent('label').text() || '';
@@ -585,7 +631,7 @@ function analyzeFields(longestFormHTML) {
 
     const submitButton = $('button[type="submit"], input[type="submit"]');
     const submitButtonClass = submitButton.attr('class');
-    const submitButtonValue = submitButton.attr('value'); // value属性を取得
+    const submitButtonValue = submitButton.attr('value');
     const submitButtonName = submitButton.attr('name');
     const submitType = submitButtonName ? ($(`input[name="${submitButtonName}"]`).length > 0 ? 'input' : 'button') : (submitButton.is('button') ? 'button' : 'input');
     const submit = submitButtonClass ? `${submitType}.${submitButtonClass.split(' ').join('.')}[type="submit"]` : `${submitType}[type="submit"]`;
@@ -715,6 +761,7 @@ async function fillFormFields(page, formData, dataToSend, originalInquiryContent
 //フィールドごとに入力処理を行う関数
 async function handleFieldInput(page, field, valueToSend) {
     const selector = getSelector(field); // セレクタを取得
+    console.log(`Handling field: ${field.name}, Selector: ${selector}, Value: ${valueToSend}`);  // デバッグ用ログ
     // セレクタがnullの場合、処理をスキップ
     if (selector === null) {
         console.warn("No selector found for field:", field);
