@@ -1,0 +1,34 @@
+# ログファイル
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ランタイムデータ
+pids
+*.pid
+*.seed
+*.log
+*.csv
+*.dat
+*.out
+*.pid
+*.gz
+
+# ディレクトリ
+node_modules
+jspm_packages
+
+# dotenv 環境変数ファイル
+.env
+.env.test
+
+# ビルドディレクトリ
+dist
+
+# その他
+.nyc_output
+coverage
+.DS_Store
+.idea
+serviceAccountKey.json
+credentials.json
