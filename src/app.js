@@ -57,6 +57,7 @@ async function run(browser, url) {
         results.result,
     );
   } catch (e) {
+    console.error(e);
     await saveResult(
         url,
         null,
@@ -112,7 +113,7 @@ async function saveResult(
     errorMessage: errorMessage,
   };
   await saveResultToFirestore(url, formData, submissionData);
-  await saveResultToSpreadsheet(url, result);
+  await saveResultToSpreadsheet(url, inputResult);
 }
 
 main().catch(console.error);

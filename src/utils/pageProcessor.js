@@ -70,7 +70,7 @@ class PageProcessor {
     while (this.state !== STATE_DONE && this.errorCount <= MAX_ERROR) {
       try {
         const processState = this.state;
-        switch (this.state) {
+        switch (processState) {
           case STATE_INPUT:
             await this.#processOnInput();
             break;
@@ -79,10 +79,10 @@ class PageProcessor {
             break;
           case STATE_COMPLETE:
             await this.#processOnComplete();
-            break;
+            continue;
           case STATE_ERROR:
             await this.#processOnError();
-            break;
+            continue;
           default:
             throw new Error(`Unknown state: ${this.state}`);
         }
@@ -270,7 +270,7 @@ class PageProcessor {
       existConfirm: this.existConfirm,
       reason: this.inputResult,
       state: this.state,
-      result: this.state === STATE_COMPLETE ? RESULT_SUCCESS : RESULT_ERROR,
+      result: this.state === STATE_DONE ? RESULT_SUCCESS : RESULT_ERROR,
       inputTrialCount: this.inputTrials,
       inputData: this.inputData,
       inputResult: this.inputResult,

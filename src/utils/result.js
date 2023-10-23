@@ -36,15 +36,15 @@ async function saveResultToFirestore(url, formData, submissionData) {
 /**
  * スプレッドシートに結果を保存する
  * @param {string} url
- * @param {string} result
+ * @param {string} inputResult
  * @return {Promise<void>}
  */
-async function saveResultToSpreadsheet(url, result) {
+async function saveResultToSpreadsheet(url, inputResult) {
   try {
     const rowNumber = await getRowNumberForUrl(url); // URLに対応する行番号を取得
     if (rowNumber === null) return; // 行が見つからない場合、処理を終了
 
-    const symbol = getSymbol(result); // 結果を記号に直す
+    const symbol = getSymbol(inputResult); // 結果を記号に直す
     const date = TimeManager.getInstance().getLocaleString();
     const range = `Sheet1!E${rowNumber}:F${rowNumber}`; // E列とF列の対応する行を指定
     const values = [[symbol, date]];
