@@ -30,7 +30,7 @@ async function saveForm(docId, data) {
   console.log('saveForm: ', data);
   try {
     data.updateTimestamp = admin.firestore.FieldValue.serverTimestamp();
-    await db.collection('forms').set(data, {merge: true});
+    await db.collection('forms').doc(docId).set(data, {merge: true});
     console.log('saveForm: ', data);
   } catch (error) {
     console.error(error);

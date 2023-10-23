@@ -1,8 +1,11 @@
-const openai = require('openai');
-openai.apiKey = process.env.OPENAI_API_KEY;
+const OpenAI = require('openai');
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY, // defaults to process.env["OPENAI_API_KEY"]
+});
 
 // OpenAIへの共通リクエスト
 async function requestGPT(model, prompt, systemPrompt = null) {
+  console.log("requestGPT", model, prompt, systemPrompt);
   const messages = [{role: 'user', content: prompt}];
   if (systemPrompt !== null) {
     messages.unshift({role: 'system', content: systemPrompt});
@@ -12,8 +15,8 @@ async function requestGPT(model, prompt, systemPrompt = null) {
     temperature: 0.2,
     model: model,
   });
-  console.log(chatCompletion);
-  return chatCompletion.choices[0].text.strip();
+  console.log("chatCompletion", chatCompletion);
+  return chatCompletion.choices[0].message.content.trim();
 }
 
 async function requestGPT4(prompt, systemPrompt = null) {
@@ -119,7 +122,15 @@ async function requestAndAnalyzeMapping(prompt) {
   }
 }
 
+async function requestDetermineState(currentPageUrl, cleanedHtmlTextContent) {
+  const systemPrompt = "あなたは世界でも有数のアシスタントです。特にHTMLの解析を得意としております。";
+  const prompt = `このbodyのテキスト内容とURL(${currentPageUrl})から、ページの位置を次の形式でjsonとして返してください。選択肢は、"完了"か、"エラー"の二択です。必ずどちらかを選択してください。"完了"の特徴としては、"送信完了","ありがとうございます","送信されました"というキーワードやそれに近しい文字が入っている可能性が高い。"エラー"の特徴としては、"エラー","必須項目が未入力です"というキーワードやそれに近しいこ言葉が入っている可能性が高い。必ず下記フォーマットで返してください。{ "位置": "完了" または "エラー" }: bodyのテキスト内容は下記です。${cleanedHtmlTextContent}`;
+  console.log('requestDetermineState', prompt, cleanedHtmlTextContent)
+  return await requestGPT35(prompt, systemPrompt);
+}
+
 module.exports = {
   createMappingPrompt,
   requestAndAnalyzeMapping,
+  requestDetermineState,
 };

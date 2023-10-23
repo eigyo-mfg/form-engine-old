@@ -1,6 +1,11 @@
 const DEFAULT_CHUNK_SIZE = 5;
 
-// 並列処理のためチャンクに分割する関数
+/**
+ * 並列処理のためチャンクに分割する関数
+ * @param array
+ * @param size
+ * @returns {*[]}
+ */
 function chunkArray(array, size = DEFAULT_CHUNK_SIZE) {
   const result = [];
   for (let i = 0; i < array.length; i += size) {

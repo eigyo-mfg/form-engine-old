@@ -1,5 +1,5 @@
 const {takeScreenshot} = require('./puppeteer');
-const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR} = require('./result');
+const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG} = require('./result');
 
 /**
  * 全フィールドに対して入力処理を行う関数
@@ -150,8 +150,11 @@ async function submitForm(page, formData) {
   await new Promise((r) => setTimeout(r, 1000));
 
   // submitボタンをクリック
-  return INPUT_RESULT_COMPLETE; // TODO
-  await page.click(formData.submit);
+  if (process.env.DEBUG === 'true') {
+    return INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG;
+  } else {
+    await page.click(formData.submit);
+  }
   console.log(formData.submit);
 
   // 送信完了を検知するセレクター

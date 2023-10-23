@@ -1,5 +1,6 @@
 const {launch} = require('puppeteer');
 const {TimeManager} = require('./time');
+const fs = require('fs');
 
 /**
  * ブラウザを立ち上げる
@@ -103,6 +104,9 @@ async function takeScreenshot(page, stage = '') {
   const tm = TimeManager.getInstance();
   const dateTime = tm.getFormattedISOString();
   const ssDir = process.env.SCREENSHOT_DIRECTORY || './screenshot';
+  if (!fs.existsSync(ssDir)){
+    fs.mkdirSync(ssDir, { recursive: true });
+  }
   const screenshotPath = `${ssDir}/${domainName}_${dateTime}_${stage}.png`;
 
   await page.screenshot({path: screenshotPath, fullPage: true});

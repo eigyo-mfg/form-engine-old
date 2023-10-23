@@ -22,10 +22,11 @@ const {
   STATE_DONE,
   STATE_CONFIRM,
   STATE_COMPLETE,
-  STATE_ERROR,
+  STATE_ERROR, currentState,
 } = require('./state');
 const MAX_ERROR = 0;
 const MAX_INPUT_TRIALS = 2;
+const MAX_TRIALS = 3;
 
 /**
  * ページの処理を行うクラス
@@ -68,6 +69,7 @@ class PageProcessor {
   async pageProcess() {
     while (this.state !== STATE_DONE && this.errorCount <= MAX_ERROR) {
       try {
+        const processState = this.state;
         switch (this.state) {
           case STATE_INPUT:
             await this.#processOnInput();
@@ -83,6 +85,11 @@ class PageProcessor {
             break;
           default:
             throw new Error(`Unknown state: ${this.state}`);
+        }
+        // 状態判定
+        this.state = await currentState(this.page, this.fields);
+        if (this.state === processState) {
+          throw new Error('State not changed');
         }
       } catch (e) {
         console.error(e);
@@ -128,7 +135,7 @@ class PageProcessor {
     // フォームに入力
     await fillFormFields(this.page, formMappingGPTResult, inputData);
     // フォームを送信
-    submitForm(this.page, formMappingGPTResult)
+    await submitForm(this.page, formMappingGPTResult)
         .then((result) => {
           console.log('Submit result:', result);
           this.inputResult = result;

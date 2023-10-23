@@ -32,3 +32,4 @@ coverage
 .idea
 serviceAccountKey.json
 credentials.json
+/screenshots/*

@@ -27,6 +27,7 @@ async function main() {
     const promises = chunk.map((url) => run(browser, url));
     await Promise.all(promises);
   }
+  browser.close();
 }
 
 // URLごとの処理
