@@ -27,7 +27,7 @@ const RESULT_ERROR = 'ERROR';
 async function saveResultToFirestore(url, formData, submissionData) {
   const docId = generateFormsDocumentId(url);
   await saveForm(docId, formData);
-  await saveSubmission({
+  await saveSubmission(docId, {
     ...submissionData,
     formId: docId,
   });
@@ -37,15 +37,18 @@ async function saveResultToFirestore(url, formData, submissionData) {
  * スプレッドシートに結果を保存する
  * @param {string} url
  * @param {string} inputResult
+ * @param {object} ssData
  * @return {Promise<void>}
  */
-async function saveResultToSpreadsheet(url, inputResult) {
+async function saveResultToSpreadsheet(url, inputResult, ssData) {
   try {
-    const rowNumber = await getRowNumberForUrl(url); // URLに対応する行番号を取得
-    if (rowNumber === null) return; // 行が見つからない場合、処理を終了
+    // const rowNumber = await getRowNumberForUrl(url); // URLに対応する行番号を取得
+    // if (rowNumber === null) return; // 行が見つからない場合、処理を終了
+    const rowNumber = ssData.rowNumber;
 
     const symbol = getSymbol(inputResult); // 結果を記号に直す
-    const date = TimeManager.getInstance().getLocaleString();
+    const date = TimeManager.getInstance().getFormattedDate();
+
     const range = `Sheet1!E${rowNumber}:F${rowNumber}`; // E列とF列の対応する行を指定
     const values = [[symbol, date]];
     await updateSpreadsheet(range, values);

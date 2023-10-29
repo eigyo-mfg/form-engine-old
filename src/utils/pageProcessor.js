@@ -1,4 +1,4 @@
-const {handleAgreement, takeScreenshot} = require('./puppeteer');
+const {handleAgreement, takeScreenshot, getLongestElementHtml} = require('./puppeteer');
 const {
   INPUT_RESULT_FORM_NOT_FOUND,
   INPUT_RESULT_ERROR,
@@ -7,9 +7,7 @@ const {
   RESULT_ERROR,
 } = require('./result');
 const {
-  analyzeFields,
-  formatAndLogFormData,
-  extractFormHTML,
+  formatAndLogFormData, getFieldsAndSubmit, stripAttributes,
 } = require('./formParser');
 const {fetchInputData} = require('../services/spreadsheet');
 const {
@@ -24,6 +22,7 @@ const {
   STATE_COMPLETE,
   STATE_ERROR, currentState,
 } = require('./state');
+const {generateFormsDocumentId} = require("../services/firestore");
 const MAX_ERROR = 0;
 const MAX_INPUT_TRIALS = 2;
 const MAX_TRIALS = 3;
@@ -31,6 +30,8 @@ const MAX_TRIALS = 3;
 /**
  * ページの処理を行うクラス
  * @property {object} page
+ * @property {string} url
+ * @property {string} formId
  * @property {string} state
  * @property {number} errorCount
  * @property {number} inputTrials
@@ -46,10 +47,13 @@ const MAX_TRIALS = 3;
 class PageProcessor {
   /**
    * コンストラクタ
-   * @param {object} page
+   * @param {Page} page
+   * @param {string} url
    */
-  constructor(page) {
+  constructor(page, url) {
     this.page = page;
+    this.url = url;
+    this.formId = generateFormsDocumentId(url);
     this.state = STATE_INPUT;
     this.errorCount = 0;
     this.inputTrials = 0;
@@ -95,6 +99,7 @@ class PageProcessor {
         console.error(e);
         this.state = STATE_ERROR;
         this.errorCount++;
+        throw new Error(e.message) // TODO
       }
     }
   }
@@ -116,26 +121,40 @@ class PageProcessor {
     // 同意画面の処理
     await handleAgreement(this.page);
     // フォームのHTMLを返す
-    const longestFormHTML = await extractFormHTML(this.page);
-    if (longestFormHTML === undefined || longestFormHTML.length === 0) {
+    // const longestFormHTML = await extractFormHTML(this.page);
+    const formHTML = await getLongestElementHtml(this.page, "form");
+    if (formHTML === undefined || formHTML.length === 0) {
       console.log('No form found in the HTML. Exiting processOnInput...');
       this.inputResult = INPUT_RESULT_FORM_NOT_FOUND;
       return;
     }
-    const {fields, submit} = analyzeFields(longestFormHTML);
+    // const {fields, submit} = analyzeFields(longestFormHTML);
+    const {fields, submit} = getFieldsAndSubmit(formHTML)
+    this.fields = fields;
+    this.submit = submit;
     console.log('Fields:', fields, 'Submit:', submit);
+
+    const formattedFormHTML = stripAttributes(formHTML);
+    console.log('Formatted form HTML:', formattedFormHTML);
+
     // 入力用データ取得
     const inputData = await fetchInputData();
+    this.inputData = inputData;
+
     // 入力データとフォームのマッピング用プロンプトを作成
-    const mappingPrompt = createMappingPrompt(fields, submit, inputData);
+    const mappingPrompt = createMappingPrompt(fields, inputData, formattedFormHTML);
+    this.mappingPrompt = mappingPrompt;
+
     // ChatGPTによるマッピング結果取得
-    const formMappingGPTResult = await requestAndAnalyzeMapping(mappingPrompt);
+    const formMappingGPTResult = await requestAndAnalyzeMapping(mappingPrompt, this.formId);
+    this.formMapping = formMappingGPTResult;
+
     // フォーム入力用データをフォーマット
     formatAndLogFormData(formMappingGPTResult, inputData);
     // フォームに入力
     await fillFormFields(this.page, formMappingGPTResult, inputData);
     // フォームを送信
-    await submitForm(this.page, formMappingGPTResult)
+    await submitForm(this.page, this.submit)
         .then((result) => {
           console.log('Submit result:', result);
           this.inputResult = result;
@@ -143,13 +162,6 @@ class PageProcessor {
         .catch((error) => {
           console.error('Submit error:', error);
           this.inputResult = INPUT_RESULT_ERROR;
-        })
-        .finally(() => {
-          this.fields = fields;
-          this.submit = submit;
-          this.formMapping = formMappingGPTResult;
-          this.inputData = inputData;
-          this.mappingPrompt = mappingPrompt;
         });
   }
 

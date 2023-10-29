@@ -1,6 +1,6 @@
 module.exports = {
   fetchInputData,
-  getUrls,
+  getUrls: getSSData,
   getRowNumberForUrl,
   getSymbol,
   updateSpreadsheet,
@@ -12,7 +12,7 @@ const cacheManager = require('../utils/cacheManager');
 const {
   INPUT_RESULT_COMPLETE,
   INPUT_RESULT_FORM_NOT_FOUND,
-  INPUT_RESULT_ERROR,
+  INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG,
 } = require('../utils/result');
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 
@@ -45,19 +45,25 @@ async function fetchSpreadsheetData(range) {
 // スプレッドシートから入力内容を呼び出す関数
 async function fetchInputData() {
   console.log('fetchInputData');
-  const range = 'input!A2:B27';
+  const range = 'input!A2:B30'; // TODO　最終行までを取得する
   const rows = await fetchSpreadsheetData(range);
   const data = parseRowData(rows);
   console.log('parseRowData:', data);
   return data;
 }
 
-async function getUrls() {
+async function getSSData() {
   const range = 'Sheet1!D2:E';
   const rows = await fetchSpreadsheetData(range);
   const urls = rows
-      .filter((row) => !row[1]) // E列(results)に値がないものだけをフィルタリング
-      .map((row) => row[0]); // D列()の値（URL）だけを取得
+      .map((row, index) => {
+        return {
+          rowNumber: index + 2, // Headerの分を+1
+          url: row[0],
+          result: row[1],
+        }
+      })
+      .filter((row) => !row.result) // E列(results)に値がないものだけをフィルタリング; // D列()の値（URL）だけを取得
   console.log('urls:', urls);
   return urls;
 }
@@ -102,6 +108,7 @@ function getSymbol(inputResult) {
     case INPUT_RESULT_ERROR:
       return '×';
     case INPUT_RESULT_FORM_NOT_FOUND:
+    case INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG:
       return '-';
     default:
       return 'Unknown';

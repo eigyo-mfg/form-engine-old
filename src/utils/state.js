@@ -7,7 +7,7 @@ const STATE_ERROR = 'ERROR';
 const STATE_DONE = 'DONE';
 
 async function currentState(page, fields) {
-  console.log("fields in currentState:", fields);
+  // console.log("fields in currentState:", fields);
   const cleanedHtmlTextContent = await cleanHtmlContent(page);
   const { isAllTextFieldsExist, isAnyTextFieldHiddenOrReadonly } = await checkTextFields(page, fields);
   const hasSubmitButton = await checkSubmitButton(page);
@@ -46,7 +46,7 @@ async function checkTextFields(page, fields) {
   const textFields = fields.filter(field => field.type === 'text').slice(0, 2); // 最初の2つのテキストフィールドを取得
   const hasTextFields = await Promise.all(
       textFields.map(async field => {
-        const selector = `input[name="${field.value}"]`;
+        const selector = `input[name="${field.name}"]`;
         const element = await page.$(selector);
         return element !== null;
       })
@@ -55,9 +55,9 @@ async function checkTextFields(page, fields) {
   //hidden,readonlyが含まれているかチェック
   const isAnyTextFieldHiddenOrReadonly = await Promise.all(
       textFields.map(async field => {
-        const element = await page.$(`input[name="${field.value}"]`);
+        const element = await page.$(`input[name="${field.name}"]`);
         if (element !== null) {
-          return await page.$eval(`input[name="${field.value}"]`, el => el.type === 'hidden' || el.readOnly);
+          return await page.$eval(`input[name="${field.name}"]`, el => el.type === 'hidden' || el.readOnly);
         } else {
           return false; // セレクタに一致する要素がない場合の値
         }

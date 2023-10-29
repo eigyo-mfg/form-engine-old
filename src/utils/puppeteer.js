@@ -56,7 +56,7 @@ async function goto(page, url) {
  * @param {number} timeout
  * @return {Promise<void>}
  */
-async function clickElement(page, xpath, timeout = 10000) {
+async function clickElement(page, xpath, timeout = 3000) {
   const [element] = await page.$x(xpath);
   if (element) {
     await element.click();
@@ -112,10 +112,93 @@ async function takeScreenshot(page, stage = '') {
   await page.screenshot({path: screenshotPath, fullPage: true});
 }
 
+/**
+ * ページ全体で最長の要素のHTMLを取得します
+ * @param {Page} page
+ * @param {string} tagName
+ * @return {Promise<string>}
+ */
+async function getLongestElementHtml(page, tagName) {
+    // ページ全体で最長の要素を取得します
+    let longestElementHtml = await page.evaluate((tag) => {
+      const elements = Array.from(document.getElementsByTagName(tag));
+      if (elements.length === 0) return null;
+      let longestElement = elements[0];
+      let longestLength = longestElement.innerHTML.length;
+      for (const element of elements) {
+        const length = element.innerHTML.length;
+        if (length > longestLength) {
+          longestElement = element;
+          longestLength = length;
+        }
+      }
+      return longestElement.outerHTML;
+    }, tagName);
+
+    // ページ全体で最長の要素が存在しない場合、iframe内をチェックします
+    if (!longestElementHtml) {
+      const frames = await page.frames();
+      for (const frame of frames) {
+        longestElementHtml = await frame.evaluate((tag) => {
+          const elements = Array.from(document.getElementsByTagName(tag));
+          if (elements.length === 0) return null;
+          let longestElement = elements[0];
+          let longestLength = longestElement.innerHTML.length;
+          for (const element of elements) {
+            const length = element.innerHTML.length;
+            if (length > longestLength) {
+              longestElement = element;
+              longestLength = length;
+            }
+          }
+          return longestElement.outerHTML;
+        }, tagName);
+        if (longestElementHtml) break;
+      }
+    }
+    return longestElementHtml;
+}
+
+async function setField(page, selector, tag, type, value){
+  if (tag === 'input') {
+    if (type === 'radio') {
+      await page.click(`${selector}[value="${value}"]`); // ラジオボタンを選択
+    } else if (type === 'checkbox') {
+      // チェックボックスの現在の状態を取得
+      const isChecked = await page.$eval(selector, (el) => el.checked);
+      if (!isChecked) {
+        // チェックボックスが選択されていない場合のみクリック
+        await page.click(`${selector}[value="${value}"]`);
+      }
+    } else {
+      // 現在の値を取得
+      const currentValue = await page.$eval(selector, (el) => el.value);
+      // 現在の値が送信する値と同じであればスキップ
+      if (currentValue === value) {
+        return;
+      }
+      if (currentValue !== '') {
+        // 現在の値をクリア
+        await page.$eval(selector, (el) => (el.value = ''));
+      }
+      await page.type(selector, value); // 値を入力
+    }
+  } else if (tag === 'textarea') {
+    await page.focus(selector); // テキストエリアにフォーカスを当てる
+    await page.$eval(selector, (el) => (el.value = '')); // 現在の値をクリア
+    await page.type(selector, value); // 新しい値を入力
+  } else if (tag === 'select') {
+    // セレクトボックスを選択
+    await page.select(selector, value);
+  }
+}
+
 module.exports = {
   launchBrowser,
   newPage,
   goto,
   handleAgreement,
   takeScreenshot,
+  getLongestElementHtml,
+  setField,
 };

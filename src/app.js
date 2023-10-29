@@ -15,23 +15,24 @@ async function main() {
   TimeManager.getInstance();
 
   // スプレッドシートからデータを取得
-  const urls = await getUrls();
+  const ssDataList = await getUrls();
 
   // URL分割
-  const chunks = chunkArray(urls);
+  const chunks = chunkArray(ssDataList);
 
   // ブラウザ立ち上げ
   const browser = await launchBrowser();
 
   for (const chunk of chunks) {
-    const promises = chunk.map((url) => run(browser, url));
+    const promises = chunk.map((ssData) => run(browser, ssData));
     await Promise.all(promises);
   }
   browser.close();
 }
 
 // URLごとの処理
-async function run(browser, url) {
+async function run(browser, ssData) {
+  const url = ssData.url;
   console.log('run:', url);
   let page;
 
@@ -41,13 +42,14 @@ async function run(browser, url) {
     await goto(page, url);
 
     // 問い合わせ処理実行
-    const processor = new PageProcessor(page);
+    const processor = new PageProcessor(page, url);
     await processor.pageProcess();
 
     // 結果を保存
     const results = processor.getResults();
     await saveResult(
         url,
+        ssData,
         results.formMapping,
         results.fields,
         results.submit,
@@ -60,6 +62,7 @@ async function run(browser, url) {
     console.error(e);
     await saveResult(
         url,
+        ssData,
         null,
         null,
         "",
@@ -77,6 +80,7 @@ async function run(browser, url) {
 /**
  * 実行結果を保存する
  * @param {string} url
+ * @param {object} ssData
  * @param {object} formMappingData
  * @param {object} fields
  * @param {string} submit
@@ -89,6 +93,7 @@ async function run(browser, url) {
  */
 async function saveResult(
     url,
+    ssData,
     formMappingData,
     fields,
     submit,
@@ -100,20 +105,20 @@ async function saveResult(
 ) {
   const formData = {
     url: url,
-    formMappingData: formMappingData, // GPT-4が整形したマッピング
     fields: fields, // 元フォーム
     submit: submit, // 元フォーム
   };
   const submissionData = {
+    errorMessage: errorMessage,
+    formMappingData: formMappingData, // GPT-4が整形したマッピング
     inputResult: inputResult,
     prompt: mappingPrompt,
-    submittedAt: TimeManager.getInstance().getISOString(),
-    state: state,
     result: result,
-    errorMessage: errorMessage,
+    state: state,
+    submittedAt: TimeManager.getInstance().getISOString(),
   };
   await saveResultToFirestore(url, formData, submissionData);
-  await saveResultToSpreadsheet(url, inputResult);
+  await saveResultToSpreadsheet(url, inputResult, ssData);
 }
 
 main().catch(console.error);

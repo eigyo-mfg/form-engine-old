@@ -1,3 +1,5 @@
+const { format } = require('date-fns')
+
 /**
  * 時間を管理するクラス
  * @class TimeManager
@@ -74,6 +76,14 @@ class TimeManager {
    */
   getLocaleString() {
     return this.date.toLocaleString();
+  }
+
+  /**
+   * フォーマットされた日付を取得
+   * @returns {string}
+   */
+  getFormattedDate() {
+    return format(this.date, 'yyyy/MM/dd HH:mm:ss');
   }
 }
 

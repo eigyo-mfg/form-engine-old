@@ -1,4 +1,4 @@
-const {takeScreenshot} = require('./puppeteer');
+const {takeScreenshot, setField} = require('./puppeteer');
 const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG} = require('./result');
 
 /**
@@ -11,18 +11,31 @@ const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DE
 async function fillFormFields(page, formData, inputData) {
   console.log('fillFormFields');
   for (const field of formData.fields) {
-    if (!field.name) continue;
-    const valueToSend = inputData[field.name];
-
-    if (
-      valueToSend === undefined &&
-      field.type !== 'radio' &&
-      field.type !== 'checkbox' &&
-      field.type !== 'select'
-    ) {
+    if (!field.name) {
+      console.warn('No name found for field:', field)
       continue;
     }
-    await handleFieldInput(page, field, valueToSend);
+    if (!field.value) {
+      console.warn('No value found for field:', field)
+      continue;
+    }
+    let sendValue = (
+        field.type === 'radio' ||
+        field.type === 'checkbox' ||
+        field.tag === 'select'
+    ) ? field.value : inputData[field.value];
+
+    // inquiry_content フィールドの場合、元の内容に戻す TODO 必要な処理か確認
+    // if (field.value === 'inquiry_content') {
+    //   sendValue = inputData.inquiry_content;
+    // }
+
+    // フィールドに値がない場合、処理をスキップ
+    if (!sendValue && field.type !== 'radio' && field.type !== 'checkbox' && field.tag !== 'select') {
+      continue;
+    }
+    // フィールドに値がある場合、入力処理を行う
+    await handleFieldInput(page, field, sendValue);
   }
 }
 
@@ -30,15 +43,15 @@ async function fillFormFields(page, formData, inputData) {
  * フィールドごとに入力処理を行う関数
  * @param {object} page
  * @param {object} field
- * @param {string} valueToSend
+ * @param {string} sendValue
  * @return {Promise<void>}
  */
-async function handleFieldInput(page, field, valueToSend) {
+async function handleFieldInput(page, field, sendValue) {
   const selector = getSelector(field); // セレクタを取得
   console.log(
       'Handling field:', field.name,
       'Selector:', selector,
-      'Value:', valueToSend,
+      'Value:', sendValue,
   );
   // セレクタがnullの場合、処理をスキップ
   if (selector === null) {
@@ -46,60 +59,11 @@ async function handleFieldInput(page, field, valueToSend) {
     return;
   }
 
-  switch (field.type) {
-    case 'text':
-    case 'email':
-    case 'date':
-    case 'month':
-    case 'number':
-    case 'tel':
-    case 'time':
-    case 'url':
-    case 'week':
-      // 現在の値を取得
-      const currentValue = await page.$eval(selector, (el) => el.value);
-      // 現在の値が送信する値と同じであればスキップ
-      if (currentValue === valueToSend) {
-        return;
-      }
-      await page.type(selector, valueToSend); // 値を入力
-      break;
-    case 'textarea':
-      await page.focus(selector); // テキストエリアにフォーカスを当てる
-      await page.$eval(selector, (el) => (el.value = '')); // 現在の値をクリア
-      await page.type(selector, valueToSend); // 新しい値を入力
-      break;
-    case 'radio':
-      const selectedRadioValue = field.values[0].selectValue; // 選択する値を取得
-      await page.click(
-          `input[name="${field.value}"][value="${selectedRadioValue}"]`,
-      ); // ラジオボタンを選択
-      break;
-    case 'checkbox':
-      const checkboxSelector = `input[name="${field.value}"]`;
-      // チェックボックスの現在の状態を取得
-      const isChecked = await page.$eval(checkboxSelector, (el) => el.checked);
-      if (!isChecked) {
-        // チェックボックスが選択されていない場合のみクリック
-        const selectedCheckboxValue = field.values[0].selectValue; // 選択する値を取得
-        if (selectedCheckboxValue) {
-          // チェックボックスが選択されている場合
-          await page.click(
-              `input[name="${field.value}"][value="${selectedCheckboxValue}"]`,
-          );
-        }
-      }
-      break;
-    case 'select':
-      // 選択する値を取得
-      const selectedSelectValue = field.values[0].selectValue;
-      // セレクトボックスを選択
-      await page.select(`select[name="${field.value}"]`, selectedSelectValue);
-      break;
-    // 他のタイプに対応する場合、ここに追加のケースを追加します
-  }
-  // 3秒から5秒のランダムな待機時間を追加
-  const milliseconds = Math.floor(Math.random() * 3000) + 2000;
+  // フィールドのタイプに応じて処理を分岐
+  await setField(page, selector, field.tag, field.type, sendValue);
+
+  // 2秒から3秒のランダムな待機時間を追加(自動入力待機など)
+  const milliseconds = Math.floor(Math.random() * 1000) + 2000;
   await new Promise((r) => setTimeout(r, milliseconds));
 }
 
@@ -109,38 +73,21 @@ async function handleFieldInput(page, field, valueToSend) {
  * @return {null|string}
  */
 function getSelector(field) {
-  switch (field.type) {
-    case 'text':
-    case 'email':
-    case 'date':
-    case 'month':
-    case 'number':
-    case 'tel':
-    case 'time':
-    case 'url':
-    case 'week':
-      return `input[name="${field.value}"]`;
-    case 'textarea':
-      return `textarea[name="${field.value}"]`;
-    case 'select':
-      return `select[name="${field.value}"]`;
-    case 'radio':
-      return `input[name="${field.value}"]`; // ラジオボタンのセレクタを返す
-    case 'checkbox':
-      return `input[name="${field.value}"]`; // チェックボックスのセレクタを返す
-    // 他のタイプに対応する場合、ここに追加のケースを追加します
-    default:
-      return null;
+  const tag = field.tag;
+  const name = field.name;
+  if (!tag || !name) {
+    return null;
   }
+  return `${tag}[name="${name}"]`;
 }
 
 /**
  * フォームを送信する関数
  * @param {object} page
- * @param {object} formData
+ * @param {string} submit
  * @return {Promise<string>}
  */
-async function submitForm(page, formData) {
+async function submitForm(page, submit) {
   console.log('submitForm');
   // スクリーンショットを撮る
   await takeScreenshot(page, 'input');
@@ -153,9 +100,10 @@ async function submitForm(page, formData) {
   if (process.env.DEBUG === 'true') {
     return INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG;
   } else {
-    await page.click(formData.submit);
+    return
+    await page.click(submit);
   }
-  console.log(formData.submit);
+  console.log(submit);
 
   // 送信完了を検知するセレクター
   const contactForm7CompleteSelector = '.wpcf7-mail-sent-ok';

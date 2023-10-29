@@ -1,4 +1,5 @@
 const {db, admin} = require('./firebase');
+const {hash} = require("../utils/crypto");
 
 function getLatestResultForUrl(url) {
   const submissionsCollectionRef = db.collection('submissions');
@@ -27,11 +28,9 @@ function generateFormsDocumentId(url) {
   return url.replace(/\//g, '__');
 }
 async function saveForm(docId, data) {
-  console.log('saveForm: ', data);
   try {
     data.updateTimestamp = admin.firestore.FieldValue.serverTimestamp();
     await db.collection('forms').doc(docId).set(data, {merge: true});
-    console.log('saveForm: ', data);
   } catch (error) {
     console.error(error);
   }
@@ -39,21 +38,74 @@ async function saveForm(docId, data) {
 
 /**
  * Firestoreにsubmissionを保存する
+ * @param {string} formKey
  * @param {object} data
  * @returns {Promise<void>}
  */
-async function saveSubmission(data) {
-  console.log('saveSubmission:', data);
+async function saveSubmission(formKey, data) {
   try {
-    await db.collection('submissions').add(data);
-    console.log('submission save succeeded:', data);
+    const docRef = await db.collection('forms')
+        .doc(formKey)
+        .collection('submissions')
+        .add(data);
+    console.log('submission save succeeded:', docRef.id);
   } catch (error) {
     console.error(error);
   }
+}
+
+async function saveAIGeneratedResponse(formId, data, docId = null) {
+  try {
+    if (!docId) {
+      const docRef = await db.collection('forms')
+          .doc(formId)
+          .collection('ai-generated-responses')
+          .add(data);
+      console.log('ai-generated-response save succeeded:', docRef.id);
+    } else {
+      await db.collection('forms')
+          .doc(formId)
+          .collection('ai-generated-responses')
+          .doc(docId)
+          .set(data, {merge: true});
+      console.log('ai-generated-response update succeeded:', docId);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function getLatestPromptResponse(formId, systemPrompt, prompt) {
+  try {
+    const docRef = await db.collection('forms')
+        .doc(formId)
+        .collection('ai-generated-responses')
+        .where('systemPrompt', '==', hash(systemPrompt))
+        .where('prompt', '==', hash(prompt))
+        .orderBy('createdAt', 'desc')
+        .limit(1)
+        .get();
+    if (docRef.empty) {
+      return null;
+    } else {
+      return docRef.docs[0].data();
+    }
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+
+function hashPrompt(prompt) {
+  const hash = crypto.createHash('sha256');
+  hash.update(prompt);
+  return hash.digest('hex');
 }
 
 module.exports = {
   generateFormsDocumentId,
   saveForm,
   saveSubmission,
+  saveAIGeneratedResponse,
+  getLatestPromptResponse,
 };

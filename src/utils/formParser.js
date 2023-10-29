@@ -199,8 +199,119 @@ function formatAndLogFormData(formData, inputData) {
   console.log('Parsed Form Data:', formData); // パース後のオブジェクトをログ出力
 }
 
+/**
+ * フィールドと送信ボタンの情報を取得する
+ * @param {string} formHtml
+ * @returns {{fields: object[], submit: object}}
+ */
+function getFieldsAndSubmit(formHtml) {
+  const $ = cheerio.load(formHtml);
+  console.log('loaded formHtml');
+  let fields = [];
+  $('input:not([type="hidden"]):not([type="submit"]), textarea, select').each((_, el) => {
+    const field = getFieldInfo($(el));
+    fields.push(field);
+  });
+  fields = mergeFields(fields);
+
+  console.log('fields', fields);
+  const submit = getSubmitInfo($('button[type="submit"], input[type="submit"]'));
+
+  return {fields, submit}
+}
+
+/**
+ * フィールドの情報を取得する
+ * @param {Element} el
+ * @returns {{name}}
+ */
+function getFieldInfo(el) {
+  const field = {};
+  const name = el.attr('name');
+  // const html = el.prop('outerHTML');
+  const tag = el.prop('tagName').toLowerCase();
+  const type = el.attr('type');
+
+  if (name) field.name = name;
+  // if (html) field.html = html;
+  if (tag) field.tag = tag;
+  if (type) field.type = type;
+
+  // selectの場合はvaluesを追加
+  if (tag === 'select') {
+    field.values = getSelectValues(el);
+  }
+
+  if (type === 'radio' || type === 'checkbox') {
+    field.values = [el.attr('value')];
+  }
+
+  return field
+}
+
+/**
+ * チェックボックスとラジオのフィールドをマージする(valuesをまとめる)
+ * @param fields
+ * @returns {*[]}
+ */
+function mergeFields(fields) {
+  let results = [];
+  fields.forEach((field) => {
+    if (field.type === 'radio' || field.type === 'checkbox') {
+      const existingField = results.find((r) => r.name === field.name && r.type === field.type);
+      if (existingField) {
+        existingField.values = existingField.values.concat(field.values);
+      } else {
+        results.push(field);
+      }
+    } else {
+      results.push(field);
+    }
+  })
+  return results
+}
+
+function getSubmitInfo(el) {
+  const submit = {};
+  const name = el.attr('name');
+  const id = el.attr('id');
+  const classes = el.attr('class');
+  const html = el.prop('outerHTML');
+
+  if (name) submit.name = name;
+  if (id) submit.id = id;
+  if (classes) submit.classes = classes;
+  if (html) submit.html = html;
+
+  return submit
+}
+
+function getSelectValues(el) {
+  return el.find('option').map(function() {
+    return el.attr('value')
+  }).get();
+}
+
+function stripAttributes(html) {
+  const $ = cheerio.load(html, {decodeEntities: false});
+
+  $('*').each(function() {
+    const attrs = this.attribs;
+    for (let attr in attrs) {
+      $(this).removeAttr(attr);
+    }
+  });
+
+  let cleanedHtml = $.html();
+  cleanedHtml = cleanedHtml.replace(/\n\s*\n/g, '\n'); // remove empty lines
+  cleanedHtml = cleanedHtml.replace(/>\s+</g, '><'); // remove spaces between tags
+  return cleanedHtml;
+}
+
 module.exports = {
   extractFormHTML,
   analyzeFields,
   formatAndLogFormData,
+  getFieldsAndSubmit,
+  stripAttributes,
 };
