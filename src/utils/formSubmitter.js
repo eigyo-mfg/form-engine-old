@@ -26,11 +26,6 @@ async function fillFormFields(page, formData, inputData) {
         !inputData[field.value]
     ) ? field.value : inputData[field.value];
 
-    // inquiry_content フィールドの場合、元の内容に戻す TODO 必要な処理か確認
-    // if (field.value === 'inquiry_content') {
-    //   sendValue = inputData.inquiry_content;
-    // }
-
     // フィールドに値がない場合、処理をスキップ
     if (!sendValue && field.type !== 'radio' && field.type !== 'checkbox' && field.tag !== 'select') {
       continue;
@@ -63,8 +58,8 @@ async function handleFieldInput(page, field, sendValue) {
   // フィールドのタイプに応じて処理を分岐
   await setField(page, selector, field.tag, field.type, sendValue);
 
-  // 2秒から3秒のランダムな待機時間を追加(自動入力待機など)
-  const milliseconds = Math.floor(Math.random() * 1000) + 2000;
+  // 1秒から2秒のランダムな待機時間を追加(自動入力待機など)
+  const milliseconds = Math.floor(Math.random() * 1000) + 1000;
   await new Promise((r) => setTimeout(r, milliseconds));
 }
 
@@ -72,15 +67,16 @@ async function handleFieldInput(page, field, sendValue) {
  * セレクタを取得する関数
  * @param {object} field
  * @param {string} attr
+ * @param {boolean} includeFormTag
  * @return {null|string}
  */
-function getSelector(field, attr = 'name') {
+function getSelector(field, attr = 'name', includeFormTag = false) {
   const tag = field.tag;
   const value = field[attr];
   if (!tag || !value) {
     return null;
   }
-  return `${tag}[${attr}="${value}"]`;
+  return `${includeFormTag ? 'form ' : ''}${tag}[${attr}="${value}"]`;
 }
 
 /**
@@ -97,17 +93,16 @@ async function submitForm(page, submit) {
   await page.setViewport({width: 800, height: 600});
   await new Promise((r) => setTimeout(r, 1000));
 
-  // submitボタンをクリック
+  // デバッグの場合は送信処理をスキップ
   if (process.env.DEBUG === 'true') {
     return INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG;
   }
 
   try {
-    const submitSelector = `form ${getSelector(submit, 'type')}`;
+    const submitSelector = getSelector(submit, 'type', true);
     console.log("submitSelector", submitSelector);
     // MutationObserverをセット
     await setupCheckThanksMutationObserver(page);
-    await page.waitForTimeout(3000);
     // 送信ボタンクリック
     await page.click(submitSelector);
     await takeScreenshot(page, 'check-submit');
@@ -128,22 +123,20 @@ async function submitForm(page, submit) {
 }
 
 async function setupCheckThanksMutationObserver (page) {
+  // フォームの変更を監視 TODO formの変更を確認するでいいのか検証
   await page.evaluate(() => {
     const observer = new MutationObserver(mutations => {
       for(let mutation of mutations) {
-        if(mutation.type === 'childList') {
-          let pageText = document.body.innerText;
-          window.__mutationSuccess = checkThanksText(pageText);
+        if(['childList', 'characterData'].includes(mutation.type)) {
+          let formText = document.body.innerText;
+          const thanksTexts = ['有難う','有り難う','有りがとう','ありがとう','完了','送信しました','送信されました','Thank You'];
+          window.__mutationSuccess = thanksTexts.some(thanksText => formText.includes(thanksText));
         }
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.querySelector('form'), { childList: true, characterData: true, subtree: true });
   });
 }
-const checkThanksText = (text) => {
-  const thanksTexts = ['有難う','有り難う','有りがとう','ありがとう','完了','Thank You'];
-  return thanksTexts.some(thanksText => text.includes(thanksText));
-};
 
 module.exports = {
   fillFormFields,
