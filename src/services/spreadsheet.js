@@ -45,7 +45,7 @@ async function fetchSpreadsheetData(range) {
 // スプレッドシートから入力内容を呼び出す関数
 async function fetchInputData() {
   console.log('fetchInputData');
-  const range = 'input!A2:B30'; // TODO　最終行までを取得する
+  const range = 'input!A2:B36'; // TODO　最終行までを取得する
   const rows = await fetchSpreadsheetData(range);
   const data = parseRowData(rows);
   console.log('parseRowData:', data);

@@ -99,7 +99,7 @@ class PageProcessor {
         console.error(e);
         this.state = STATE_ERROR;
         this.errorCount++;
-        throw new Error(e.message) // TODO
+        // throw new Error(e.message) // TODO
       }
     }
   }

@@ -20,9 +20,10 @@ async function fillFormFields(page, formData, inputData) {
       continue;
     }
     let sendValue = (
-        field.type === 'radio' ||
+        (field.type === 'radio' ||
         field.type === 'checkbox' ||
-        field.tag === 'select'
+        field.tag === 'select') &&
+        !inputData[field.value]
     ) ? field.value : inputData[field.value];
 
     // inquiry_content フィールドの場合、元の内容に戻す TODO 必要な処理か確認
@@ -70,15 +71,16 @@ async function handleFieldInput(page, field, sendValue) {
 /**
  * セレクタを取得する関数
  * @param {object} field
+ * @param {string} attr
  * @return {null|string}
  */
-function getSelector(field) {
+function getSelector(field, attr = 'name') {
   const tag = field.tag;
-  const name = field.name;
-  if (!tag || !name) {
+  const value = field[attr];
+  if (!tag || !value) {
     return null;
   }
-  return `${tag}[name="${name}"]`;
+  return `${tag}[${attr}="${value}"]`;
 }
 
 /**
@@ -91,7 +93,6 @@ async function submitForm(page, submit) {
   console.log('submitForm');
   // スクリーンショットを撮る
   await takeScreenshot(page, 'input');
-
   // viewportを元に戻す
   await page.setViewport({width: 800, height: 600});
   await new Promise((r) => setTimeout(r, 1000));
@@ -99,86 +100,50 @@ async function submitForm(page, submit) {
   // submitボタンをクリック
   if (process.env.DEBUG === 'true') {
     return INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG;
-  } else {
-    return
-    await page.click(submit);
-  }
-  console.log(submit);
-
-  // 送信完了を検知するセレクター
-  const contactForm7CompleteSelector = '.wpcf7-mail-sent-ok';
-  const responseOutputSelector = '.wpcf7-response-output';
-  const screenReaderResponseSelector =
-    '.screen-reader-response p[role="status"]'; // 新しいセレクター
-
-  // タイムアウトを設定
-  const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 10000));
-
-  // ページ遷移と送信完了の検知
-  const completePromise = page.waitForSelector(contactForm7CompleteSelector, {
-    timeout: 10000,
-  });
-  const responsePromise = page.waitForSelector(responseOutputSelector, {
-    timeout: 10000,
-  });
-  const newCompletePromise = page.waitForSelector(
-      screenReaderResponseSelector,
-      {timeout: 10000},
-  );
-
-  // タイムアウト、送信完了、送信結果のいずれかが発生するまで待つ
-  await Promise.race([
-    timeoutPromise,
-    completePromise,
-    responsePromise,
-    newCompletePromise,
-  ]);
-
-  // 送信完了を確認
-  const isComplete = await page.$(contactForm7CompleteSelector);
-  if (isComplete) {
-    return INPUT_RESULT_COMPLETE;
   }
 
-  // 送信結果のテキストを確認（既存のセレクター）
-  const responseElement = await page.$(responseOutputSelector);
-  if (responseElement) {
-    const textContent = await page.evaluate(
-        (el) => el.textContent,
-        responseElement,
-    );
-    if (
-      textContent.includes('有難う') ||
-      textContent.includes('有り難う') ||
-      textContent.includes('有りがとう') ||
-      textContent.includes('ありがとう') ||
-      textContent.includes('完了') ||
-      textContent.includes('Thank You')
-    ) {
-      return INPUT_RESULT_COMPLETE;
-    }
-  }
+  try {
+    const submitSelector = `form ${getSelector(submit, 'type')}`;
+    console.log("submitSelector", submitSelector);
+    // MutationObserverをセット
+    await setupCheckThanksMutationObserver(page);
+    await page.waitForTimeout(3000);
+    // 送信ボタンクリック
+    await page.click(submitSelector);
+    await takeScreenshot(page, 'check-submit');
 
-  // 送信結果のテキストを確認（新しいセレクター）
-  const newResponseElement = await page.$(screenReaderResponseSelector);
-  if (newResponseElement) {
-    const newTextContent = await page.evaluate(
-        (el) => el.textContent,
-        newResponseElement,
-    );
-    if (
-      newTextContent.includes('有難う') ||
-      newTextContent.includes('有り難う') ||
-      newTextContent.includes('有りがとう') ||
-      newTextContent.includes('ありがとう') ||
-      newTextContent.includes('Thank You')
-    ) {
-      return INPUT_RESULT_COMPLETE;
-    }
+    // 送信結果の完了を確認する(Thanksテキストが表示される or ページ遷移
+    let result = await Promise.race([
+      page.waitForFunction(() => window.__mutationSuccess === true).then(() => 'mutationSuccess'),
+      page.waitForNavigation({timeout: 10000}).then(() => 'navigation'),
+    ]);
+    console.log('result', result)
+    // 成功
+    return INPUT_RESULT_COMPLETE
+  } catch (e) {
+    console.error(e);
+    // 失敗
+    return INPUT_RESULT_ERROR;
   }
-  // タイムアウトが発生した場合、または送信完了セレクターまたは送信結果セレクターが見つからなかった場合、何も返さずに関数を終了
-  return INPUT_RESULT_ERROR;
 }
+
+async function setupCheckThanksMutationObserver (page) {
+  await page.evaluate(() => {
+    const observer = new MutationObserver(mutations => {
+      for(let mutation of mutations) {
+        if(mutation.type === 'childList') {
+          let pageText = document.body.innerText;
+          window.__mutationSuccess = checkThanksText(pageText);
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+}
+const checkThanksText = (text) => {
+  const thanksTexts = ['有難う','有り難う','有りがとう','ありがとう','完了','Thank You'];
+  return thanksTexts.some(thanksText => text.includes(thanksText));
+};
 
 module.exports = {
   fillFormFields,

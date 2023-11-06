@@ -273,22 +273,18 @@ function mergeFields(fields) {
 
 function getSubmitInfo(el) {
   const submit = {};
-  const name = el.attr('name');
-  const id = el.attr('id');
-  const classes = el.attr('class');
-  const html = el.prop('outerHTML');
+  const tag = el.prop('tagName').toLowerCase();
+  const type = el.attr('type');
 
-  if (name) submit.name = name;
-  if (id) submit.id = id;
-  if (classes) submit.classes = classes;
-  if (html) submit.html = html;
+  if (tag) submit.tag = tag;
+  if (type) submit.type = type;
 
   return submit
 }
 
 function getSelectValues(el) {
   return el.find('option').map(function() {
-    return el.attr('value')
+    return this.attribs.value
   }).get();
 }
 
