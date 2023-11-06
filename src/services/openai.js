@@ -59,9 +59,14 @@ The html structure of the entire inquiry form is as follows.
 ${formattedFormHTML}
 
 Analyze the following form fields and inquiries data. Create a mapping between the form fields 'name' attribute and the corresponding keys in the inquiries data. The result should be added as a "value" field in the form field data. 
-For the fields of type 'select', 'checkbox', and 'radio', you don't need to map the data. Instead, choose one of the values and add the chosen value as the "value" field. 
 Please note, the "value" field should contain the key from the inquiries data that corresponds to the form field, not the actual value from the inquiries data.
-Remove the 'html' fields from the output and present the results in JSON format. 
+As an exception, if the field type is 'select', 'checkbox' or 'radio', the value field must be set to the most applicable choice from the values instead of mapping keys.
+Remove the 'html' fields from the output and present the results in JSON format.
+
+Please be aware that addresses may be split into separate fields,
+names may be separated into first and last,
+and entries may require specific formats such as katakana or hiragana.
+
 The output should look like this:
 {"fields":[{"name":"lastname_kana","tag":"input","type":"text","value":"last_name_kana"},{"name":"company","tag":"input","type":"text","value":"company_name"},{"name":"select_field","tag":"select","values":["a","b","c"],"value":"b"},{"name":"checkbox_field","tag":"input","type":"checkbox","values":["one","two"],"value":"one"},…]}
 `
@@ -126,7 +131,7 @@ Note:
 }
 
 function formatInputForPrompt(inputData) {
-  let formatInputData = inputData;
+  let formatInputData = { ...inputData };
   formatInputData.inquiry_content = formatInputData.inquiry_content.substring(0, 40);
   return JSON.stringify(formatInputData);
 }
