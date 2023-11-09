@@ -118,7 +118,7 @@ async function saveResult(
     submittedAt: TimeManager.getInstance().getISOString(),
   };
   await saveResultToFirestore(url, formData, submissionData);
-  await saveResultToSpreadsheet(url, inputResult, ssData);
+  await saveResultToSpreadsheet(url, inputResult, result, ssData);
 }
 
 main().catch(console.error);

@@ -12,7 +12,7 @@ const cacheManager = require('../utils/cacheManager');
 const {
   INPUT_RESULT_COMPLETE,
   INPUT_RESULT_FORM_NOT_FOUND,
-  INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG,
+  INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG, RESULT_SUCCESS, RESULT_ERROR,
 } = require('../utils/result');
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 
@@ -101,10 +101,23 @@ async function getRowNumberForUrl(url) {
   return rowIndex + 2; // 行番号は2から始まるため、インデックスに2を足す
 }
 
-function getSymbol(inputResult) {
+/**
+ * 結果を記号に変換する
+ * @param {string} inputResult
+ * @param {string} result
+ * @returns {string}
+ */
+function getSymbol(inputResult, result) {
   switch (inputResult) {
     case INPUT_RESULT_COMPLETE:
-      return '⚪︎';
+      switch (result) {
+        case RESULT_SUCCESS:
+          return '○';
+        case RESULT_ERROR:
+          return '△';
+        default:
+          return 'Unknown';
+      }
     case INPUT_RESULT_ERROR:
       return '×';
     case INPUT_RESULT_FORM_NOT_FOUND:
