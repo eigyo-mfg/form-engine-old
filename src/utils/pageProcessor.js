@@ -90,6 +90,8 @@ class PageProcessor {
           default:
             throw new Error(`Unknown state: ${this.state}`);
         }
+        // スクリーンショットを撮る
+        await takeScreenshot(this.page, processState + '-end');
         // 状態判定
         this.state = await currentState(this.page, this.fields, this.formId);
         if (this.state === processState) {

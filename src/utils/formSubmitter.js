@@ -88,7 +88,7 @@ function getSelector(field, attr = 'name', includeFormTag = false) {
 async function submitForm(page, submit) {
   console.log('submitForm');
   // スクリーンショットを撮る
-  await takeScreenshot(page, 'input');
+  await takeScreenshot(page, 'input-before-submit');
   // viewportを元に戻す
   await page.setViewport({width: 800, height: 600});
   await new Promise((r) => setTimeout(r, 1000));
@@ -105,7 +105,7 @@ async function submitForm(page, submit) {
     await setupCheckThanksMutationObserver(page);
     // 送信ボタンクリック
     await page.click(submitSelector);
-    await takeScreenshot(page, 'check-submit');
+    await takeScreenshot(page, 'input-submit-clicked');
 
     // 送信結果の完了を確認する(Thanksテキストが表示される or ページ遷移
     const result = await Promise.race([

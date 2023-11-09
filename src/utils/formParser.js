@@ -306,7 +306,6 @@ function stripAttributes(html) {
 
 module.exports = {
   extractFormHTML,
-  analyzeFields,
   formatAndLogFormData,
   getFieldsAndSubmit,
   stripAttributes,
