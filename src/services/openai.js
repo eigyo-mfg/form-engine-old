@@ -38,12 +38,12 @@ async function requestGPT(model, prompt, systemPrompt = null, formId = null) {
 }
 
 async function requestGPT4(prompt, systemPrompt = null, formId = null) {
-  const model = 'gpt-4';
+  const model = 'gpt-4-1106-preview';
   return await requestGPT(model, prompt, systemPrompt, formId);
 }
 
 async function requestGPT35(prompt, systemPrompt = null, formId = null) {
-  const model = 'gpt-3.5-turbo';
+  const model = 'gpt-3.5-turbo-1106';
   return await requestGPT(model, prompt, systemPrompt, formId);
 }
 
