@@ -112,7 +112,7 @@ function getSymbol(inputResult, result) {
     case INPUT_RESULT_COMPLETE:
       switch (result) {
         case RESULT_SUCCESS:
-          return '○';
+          return '⚪︎';
         case RESULT_ERROR:
           return '△';
         default:

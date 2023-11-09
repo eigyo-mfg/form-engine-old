@@ -288,7 +288,7 @@ function getSelectValues(el) {
   }).get();
 }
 
-function stripAttributes(html) {
+function removeAttributes(html) {
   const $ = cheerio.load(html, {decodeEntities: false});
 
   $('*').each(function() {
@@ -304,9 +304,19 @@ function stripAttributes(html) {
   return cleanedHtml;
 }
 
+/**
+ * ヘッダー、フッター、サイドバーの要素を削除する
+ */
+function removeHeaderFooterSidebar(html) {
+  const $ = cheerio.load(html);
+  $('header, footer, .sidebar').remove();
+  return $.html();
+}
+
 module.exports = {
   extractFormHTML,
   formatAndLogFormData,
   getFieldsAndSubmit,
-  stripAttributes,
+  removeAttributes,
+  removeHeaderFooterSidebar,
 };

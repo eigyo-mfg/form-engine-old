@@ -7,7 +7,7 @@ const {
   RESULT_ERROR,
 } = require('./result');
 const {
-  formatAndLogFormData, getFieldsAndSubmit, stripAttributes,
+  formatAndLogFormData, getFieldsAndSubmit, removeAttributes,
 } = require('./formParser');
 const {fetchInputData} = require('../services/spreadsheet');
 const {
@@ -136,7 +136,7 @@ class PageProcessor {
     this.submit = submit;
     console.log('Fields:', fields, 'Submit:', submit);
 
-    const formattedFormHTML = stripAttributes(formHTML);
+    const formattedFormHTML = removeAttributes(formHTML);
     console.log('Formatted form HTML:', formattedFormHTML);
 
     // 入力用データ取得

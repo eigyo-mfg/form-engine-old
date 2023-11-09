@@ -1,6 +1,7 @@
 const {requestDetermineState} = require("../services/openai");
 const {generateFormsDocumentId} = require("../services/firestore");
 const {extractJson} = require("./string");
+const {removeAttributes, removeHeaderFooterSidebar} = require("./formParser");
 const STATE_UNKNOWN = 'UNKNOWN';
 const STATE_INPUT = 'INPUT';
 const STATE_CONFIRM = 'CONFIRM';
@@ -21,26 +22,27 @@ async function currentState(page, fields, formId) {
 // HTMLコンテンツのクリーニング
 async function cleanHtmlContent(page) {
   console.log('cleanHtmlContent');
-  const longestDiv = await page.evaluate(() => {
+  // 最も階層が深いdivを取得 (ヘッダーやサイドバー、フッターなどのテキストが含まれていない部分を取得したいため)
+  const deepestDiv = await page.evaluate(() => {
     const divs = Array.from(document.querySelectorAll('div'));
-    let longestText = '';
-    let longestDiv = null;
+    let maxChildren = 0;
+    let deepestDiv = null;
 
     divs.forEach(div => {
-      const textContent = div.textContent.trim();
-      if (textContent.length > longestText.length) {
-        longestText = textContent;
-        longestDiv = div;
+      const childrenCount = div.getElementsByTagName('*').length;
+      if (childrenCount > maxChildren) {
+        maxChildren = childrenCount;
+        deepestDiv = div;
       }
     });
 
-    return longestDiv ? longestDiv.outerHTML : null;
+    return deepestDiv ? deepestDiv.outerHTML : null;
   });
 
-  return longestDiv
-      .replace(/\s+/g, ' ')
-      .replace(/\n+/g, ' ')
-      .trim();
+  const mainDiv = removeHeaderFooterSidebar(deepestDiv);
+  const cleaned = removeAttributes(mainDiv);
+
+  return cleaned;
 }
 
 // テキストフィールドのチェック
@@ -51,7 +53,13 @@ async function checkTextFields(page, fields) {
   const isAllTextFieldsExist = (await Promise.all(
       textFields.map(async field => {
         const selector = `input[name="${field.name}"]`;
-        return Boolean(await page.$(selector));
+        try {
+          await page.waitForSelector(selector, { timeout: 5000 });
+          return true;
+        } catch {
+          // セレクタが見つからなかった場合はfalseを返す
+          return false;
+        }
       })
   )).every(Boolean);
 
@@ -126,19 +134,22 @@ async function determineStateWithChatGPT(page, cleanedHtmlTextContent, formId) {
   console.log("determineStateWithChatGPT");
   // 応答に基づいて状態を返す
   const responseMessage = await requestDetermineState(cleanedHtmlTextContent, formId);
-  const responseContent = extractJson(responseMessage.content);
+  const responseContent = extractJson(responseMessage);
   const result = responseContent["result"];
   if (result === "failure") {
     return STATE_UNKNOWN;
   }
   const state = responseContent["state"];
-  if (state === '完了') {
-    return STATE_COMPLETE;
+  switch (state) {
+    case 'confirm':
+      return STATE_CONFIRM;
+    case 'complete':
+      return STATE_COMPLETE;
+    case 'error':
+      return STATE_ERROR;
+    default:
+      return STATE_UNKNOWN;
   }
-  if (state === 'エラー') {
-    return STATE_ERROR;
-  }
-  return STATE_UNKNOWN;
 }
 
 
