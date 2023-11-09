@@ -1,5 +1,5 @@
 const OpenAI = require('openai');
-const {saveAIGeneratedResponse, getLatestPromptResponse} = require("./firestore");
+const {saveAIGeneratedResponse, getLatestPromptResponse, generateFormsDocumentId} = require("./firestore");
 const {hash} = require("../utils/crypto");
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY, // defaults to process.env["OPENAI_API_KEY"]
@@ -34,7 +34,9 @@ async function requestGPT(model, prompt, systemPrompt = null, formId = null) {
 
   await saveAPIResult(formId, model, systemPrompt, prompt, chatCompletion, usedTokens);
 
-  return chatCompletion.choices[0].message.content.trim();
+  const chatgptResponseMessage = chatCompletion.choices[0].message.content.trim();
+  console.log("chatgptResponseMessage", chatgptResponseMessage)
+  return chatgptResponseMessage;
 }
 
 async function requestGPT4(prompt, systemPrompt = null, formId = null) {
@@ -168,11 +170,10 @@ async function requestAndAnalyzeMapping(prompt, formId) {
   }
 }
 
-async function requestDetermineState(currentPageUrl, cleanedHtmlTextContent) {
+async function requestDetermineState(currentPageUrl, cleanedHtmlTextContent, formId) {
   const systemPrompt = "あなたは世界でも有数のアシスタントです。特にHTMLの解析を得意としております。";
-  const prompt = `このbodyのテキスト内容とURL(${currentPageUrl})から、ページの位置を次の形式でjsonとして返してください。選択肢は、"完了"か、"エラー"の二択です。必ずどちらかを選択してください。"完了"の特徴としては、"送信完了","ありがとうございます","送信されました"というキーワードやそれに近しい文字が入っている可能性が高い。"エラー"の特徴としては、"エラー","必須項目が未入力です"というキーワードやそれに近しいこ言葉が入っている可能性が高い。必ず下記フォーマットで返してください。{ "位置": "完了" または "エラー" }: bodyのテキスト内容は下記です。${cleanedHtmlTextContent}`;
-  console.log('requestDetermineState', prompt, cleanedHtmlTextContent)
-  return await requestGPT35(prompt, systemPrompt);
+  const prompt = `このbodyのテキスト内容とURL(${currentPageUrl})から、ページの位置を次の形式でjsonとして返してください。選択肢は、"完了"、"確認"、"エラー"の三択です。必ずいずれかを選択してください。"完了"の特徴としては、"送信完了","ありがとうございます","送信されました"というキーワードやそれに近しい文字が入っている可能性が高い。"確認"の特徴としては、formタグ内に入力されたデータが表示されたり、ヘッダーや送信ボタンに確認の文字列が含まれてる可能性があります。"エラー"の特徴としては、"エラー","必須項目が未入力です"というキーワードやそれに近しいこ言葉が入っている可能性が高い。必ず次のJSONフォーマットで結果を返してください。{ "位置": "完了" または "確認" または "エラー" }: bodyのテキスト内容は下記です。${cleanedHtmlTextContent}`;
+  return await requestGPT35(prompt, systemPrompt, formId);
 }
 
 async function saveAPIResult(formId, model, systemPrompt, prompt, chatCompletion) {
