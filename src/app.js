@@ -103,11 +103,13 @@ async function saveResult(
     result,
     errorMessage = "",
 ) {
+  // Firestoreのformコレクションに保存するデータ
   const formData = {
     url: url,
     fields: fields, // 元フォーム
     submit: submit, // 元フォーム
   };
+  // Firestoreのsubmissionサブコレクションに保存するデータ
   const submissionData = {
     errorMessage: errorMessage,
     formMappingData: formMappingData, // GPT-4が整形したマッピング
