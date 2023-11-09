@@ -1,6 +1,7 @@
 const OpenAI = require('openai');
 const {saveAIGeneratedResponse, getLatestPromptResponse, generateFormsDocumentId} = require("./firestore");
 const {hash} = require("../utils/crypto");
+const {extractJson} = require("../utils/string");
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY, // defaults to process.env["OPENAI_API_KEY"]
 });
@@ -145,34 +146,22 @@ async function requestAndAnalyzeMapping(prompt, formId) {
     'You are a professional who deeply understands the structure of HTML and is proficient in both English and Japanese. You are capable of minimizing mistakes, carefully verifying multiple times, and handling tasks with precision.';
 
   // GPT-4を使用してマッピングを作成
-  const mappedName = await requestGPT4(prompt, systemPrompt, formId);
-  console.log('mappedName:', mappedName);
+  const response = await requestGPT4(prompt, systemPrompt, formId);
+  console.log('GPT4 response:', response);
 
-  // 最初の波括弧 '{' のインデックスを取得
-  const startIndex = mappedName.indexOf('{');
-
-  // 最後の波括弧 '}' のインデックスを取得
-  const endIndex = mappedName.lastIndexOf('}');
-
-  // 開始インデックスと終了インデックスを使用してJSON文字列を抽出
-  const jsonStr = mappedName.substring(startIndex, endIndex + 1);
-
-  // コメントを削除（//から始まる行を削除）
-  const jsonWithoutComments = jsonStr.replace(/\/\/.*$/gm, '');
   try {
-    // JSON文字列をパース
-    const formData = JSON.parse(jsonWithoutComments);
-    return formData;
+    // JSON文字列を取得、パースして、マッピング情報を取得
+    const formMapping = extractJson(response)
+    return formMapping;
   } catch (error) {
     console.error('Error parsing JSON:', error);
-    console.log('JSON string:', jsonWithoutComments);
     throw error; // エラーを再スローして処理を停止
   }
 }
 
 async function requestDetermineState(cleanedHtmlTextContent, formId) {
   const systemPrompt = "あなたは世界でも有数のアシスタントです。特にHTMLの解析を得意としております。";
-  const prompt = `このbodyのテキスト内容から、ページの状態(state)を次の形式でjsonとして返してください。選択肢は、"complete"、"confirm"、"error"の三択です。必ずいずれかを選択してください。"complete"の特徴としては、"送信完了","ありがとうございます","送信されました"というキーワードやそれに近しい文字が入っている可能性が高い。"confirm"の特徴としては、formタグ内に入力されたデータが表示されたり、ヘッダーや送信ボタンに確認の文字列が含まれてる可能性があります。"error"の特徴としては、"エラー","必須項目が未入力です"というキーワードやそれに近しいこ言葉が入っている可能性が高い。必ず次のJSONフォーマットで結果を返してください。{ "state": "complete" または "confirm" または "error", "result": "success" }  "result"に、判別ができた場合は"success"、判別できなかった場合は"failure"を入れてください。 bodyのテキスト内容は下記です。${cleanedHtmlTextContent}`;
+  const prompt = `このbodyのテキスト内容から、ページの状態(state)の判定結果をjson形式で返してください。もし判定できなくても必ずJSON形式で返してください。選択肢は、"complete"、"confirm"、"error"の三択です。必ずいずれかを選択してください。"complete"の特徴は、"送信完了","ありがとうございます","送信されました"というキーワードやそれに近しい文字が入っている可能性が高い。"confirm"の特徴は、送信の確認を意味する言葉が含まれてる可能性が高い。"error"の特徴は、"エラー","必須項目が未入力です"というキーワードや類似の言葉が入っている可能性が高い。必ず次のJSONフォーマットで結果を返してください。{ "state": "complete" または "confirm" または "error", "result": "success" }  "result"に、判別ができた場合は"success"、判別できなかった場合は"failure"を入れてください。 bodyのテキスト内容は下記です。${cleanedHtmlTextContent}`;
   return await requestGPT35(prompt, systemPrompt, formId);
 }
 
