@@ -108,7 +108,7 @@ async function submitForm(page, submit) {
     await takeScreenshot(page, 'check-submit');
 
     // 送信結果の完了を確認する(Thanksテキストが表示される or ページ遷移
-    let result = await Promise.race([
+    const result = await Promise.race([
       page.waitForFunction(() => window.__mutationSuccess === true).then(() => 'mutationSuccess'),
       page.waitForNavigation({timeout: 10000}).then(() => 'navigation'),
     ]);

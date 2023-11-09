@@ -170,9 +170,9 @@ async function requestAndAnalyzeMapping(prompt, formId) {
   }
 }
 
-async function requestDetermineState(currentPageUrl, cleanedHtmlTextContent, formId) {
+async function requestDetermineState(cleanedHtmlTextContent, formId) {
   const systemPrompt = "あなたは世界でも有数のアシスタントです。特にHTMLの解析を得意としております。";
-  const prompt = `このbodyのテキスト内容とURL(${currentPageUrl})から、ページの位置を次の形式でjsonとして返してください。選択肢は、"完了"、"確認"、"エラー"の三択です。必ずいずれかを選択してください。"完了"の特徴としては、"送信完了","ありがとうございます","送信されました"というキーワードやそれに近しい文字が入っている可能性が高い。"確認"の特徴としては、formタグ内に入力されたデータが表示されたり、ヘッダーや送信ボタンに確認の文字列が含まれてる可能性があります。"エラー"の特徴としては、"エラー","必須項目が未入力です"というキーワードやそれに近しいこ言葉が入っている可能性が高い。必ず次のJSONフォーマットで結果を返してください。{ "位置": "完了" または "確認" または "エラー" }: bodyのテキスト内容は下記です。${cleanedHtmlTextContent}`;
+  const prompt = `このbodyのテキスト内容から、ページの状態(state)を次の形式でjsonとして返してください。選択肢は、"complete"、"confirm"、"error"の三択です。必ずいずれかを選択してください。"complete"の特徴としては、"送信完了","ありがとうございます","送信されました"というキーワードやそれに近しい文字が入っている可能性が高い。"confirm"の特徴としては、formタグ内に入力されたデータが表示されたり、ヘッダーや送信ボタンに確認の文字列が含まれてる可能性があります。"error"の特徴としては、"エラー","必須項目が未入力です"というキーワードやそれに近しいこ言葉が入っている可能性が高い。必ず次のJSONフォーマットで結果を返してください。{ "state": "complete" または "confirm" または "error", "result": "success" }  "result"に、判別ができた場合は"success"、判別できなかった場合は"failure"を入れてください。 bodyのテキスト内容は下記です。${cleanedHtmlTextContent}`;
   return await requestGPT35(prompt, systemPrompt, formId);
 }
 

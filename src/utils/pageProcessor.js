@@ -91,9 +91,9 @@ class PageProcessor {
             throw new Error(`Unknown state: ${this.state}`);
         }
         // 状態判定
-        this.state = await currentState(this.page, this.fields);
+        this.state = await currentState(this.page, this.fields, this.formId);
         if (this.state === processState) {
-          throw new Error('State not changed');
+          throw new Error('State not changed. state=' + this.state);
         }
       } catch (e) {
         console.error(e);
