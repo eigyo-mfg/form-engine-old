@@ -1,5 +1,6 @@
 const {requestDetermineState} = require("../services/openai");
 const {generateFormsDocumentId} = require("../services/firestore");
+const {extractJson} = require("./string");
 const STATE_UNKNOWN = 'UNKNOWN';
 const STATE_INPUT = 'INPUT';
 const STATE_CONFIRM = 'CONFIRM';
@@ -8,8 +9,8 @@ const STATE_ERROR = 'ERROR';
 const STATE_DONE = 'DONE';
 
 async function currentState(page, fields, formId) {
-  // console.log("fields in currentState:", fields);
   const cleanedHtmlTextContent = await cleanHtmlContent(page);
+  console.log("cleanedHtmlTextContent:", cleanedHtmlTextContent);
   const { isAllTextFieldsExist, isAllTextFieldHiddenOrReadonly } = await checkTextFields(page, fields);
   const hasSubmitButton = await checkSubmitButton(page);
   const currentState = await determineState(page, cleanedHtmlTextContent, isAllTextFieldsExist, isAllTextFieldHiddenOrReadonly, hasSubmitButton, formId);
@@ -20,23 +21,23 @@ async function currentState(page, fields, formId) {
 // HTMLコンテンツのクリーニング
 async function cleanHtmlContent(page) {
   console.log('cleanHtmlContent');
-  const bodyHandle = await page.$('body');
-  const htmlTextContent = await page.evaluate(body => {
-    // スクリプトタグを取得
-    const scriptTags = body.querySelectorAll('script');
+  const longestDiv = await page.evaluate(() => {
+    const divs = Array.from(document.querySelectorAll('div'));
+    let longestText = '';
+    let longestDiv = null;
 
-    // スクリプトタグの内容を空にする
-    scriptTags.forEach(script => {
-      script.textContent = '';
+    divs.forEach(div => {
+      const textContent = div.textContent.trim();
+      if (textContent.length > longestText.length) {
+        longestText = textContent;
+        longestDiv = div;
+      }
     });
 
-    // その後、残りのテキストコンテンツを取得
-    return body.textContent;
-  }, bodyHandle);
+    return longestDiv ? longestDiv.outerHTML : null;
+  });
 
-  await bodyHandle.dispose();
-
-  return htmlTextContent
+  return longestDiv
       .replace(/\s+/g, ' ')
       .replace(/\n+/g, ' ')
       .trim();
@@ -85,6 +86,7 @@ async function checkSubmitButton(page) {
  */
 
 async function determineState(page, cleanedHtmlTextContent, isAllTextFieldsExist, isAllTextFieldHiddenOrReadonly, hasSubmitButton, formId) {
+  // デバッグモードの場合は、送信処理を行わなず、入力状態から変わらずにエラーになるので、完了状態を返す
   if (process.env.DEBUG === 'true') {
     console.log('Complete for debug')
     return STATE_COMPLETE;
@@ -124,8 +126,7 @@ async function determineStateWithChatGPT(page, cleanedHtmlTextContent, formId) {
   console.log("determineStateWithChatGPT");
   // 応答に基づいて状態を返す
   const responseMessage = await requestDetermineState(cleanedHtmlTextContent, formId);
-  const responseContentString = responseMessage.content.match(/\{[^\}]+\}/)[0];
-  const responseContent = JSON.parse(responseContentString);
+  const responseContent = extractJson(responseMessage.content);
   const result = responseContent["result"];
   if (result === "failure") {
     return STATE_UNKNOWN;
