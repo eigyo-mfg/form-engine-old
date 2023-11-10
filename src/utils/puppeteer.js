@@ -162,14 +162,19 @@ async function getLongestElementHtml(page, tagName) {
 async function setField(page, selector, tag, type, value){
   if (tag === 'input') {
     if (type === 'radio') {
-      await page.click(`${selector}[value="${value}"]`); // ラジオボタンを選択
+      await page.click(`${tag}[value="${value}"]`); // ラジオボタンを選択
     } else if (type === 'checkbox') {
-      // チェックボックスの現在の状態を取得
-      const isChecked = await page.$eval(selector, (el) => el.checked);
-      if (!isChecked) {
-        // チェックボックスが選択されていない場合のみクリック
-        await page.click(`${selector}[value="${value}"]`);
+      // 一旦全てのチェックボックスのチェックを外す
+      const checkboxes = await page.$$(selector);
+      for (let checkbox of checkboxes) {
+        let isChecked = await page.evaluate(el => el.checked, checkbox);
+        // チェックされてたらクリック
+        if (isChecked) {
+          await checkbox.click();
+        }
       }
+      // 全てのチェックボックスが外れた後、対象のチェックボックスをクリック
+      await page.click(`${tag}[value="${value}"]`);
     } else {
       // 現在の値を取得
       const currentValue = await page.$eval(selector, (el) => el.value);
