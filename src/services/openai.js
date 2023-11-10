@@ -24,7 +24,7 @@ async function requestGPT(model, prompt, systemPrompt = null, formId = null) {
 
   const chatCompletion = await openai.chat.completions.create({
     messages: messages,
-    temperature: 0.2,
+    temperature: 0,
     model: model,
   });
   console.log("chatCompletion", chatCompletion);
@@ -61,20 +61,21 @@ ${inputDataJson}
 The html structure of the entire inquiry form is as follows.
 ${formattedFormHTML}
 
-Analyze the following form fields and inquiries data. Create a mapping between the form fields 'name' attribute and the corresponding keys in the inquiries data. The result should be added as a "value" field in the form field data. 
+Analyze the following form fields and inquiries data. Create a mapping between the form fields 'name' attribute and the corresponding keys in the inquiries data. Only one result must be added as a "value" field in the form field data. 
 Please note, the "value" field should contain the key from the inquiries data that corresponds to the form field, not the actual value from the inquiries data.
-If the field "type" is 'select', 'checkbox' or 'radio', the "value" field must be set to the most applicable choice from the "values" field instead of mapping keys.
+If the field "tag" is 'select' or the field "type" is 'checkbox' or 'radio', you must choose one of the best options from the "values", not the key mappings.
 Remove the 'html' fields from the output and present the results in JSON format.
+The fields entries must not be deleted.
 
 Observe the following points when creating the mapping:
-- Addresses may be distributed across multiple fields. Also, no part of the address may overlap with another field.
+- Addresses may be distributed across multiple fields. Also, no part of the address, including the "select" tag field, may overlap with another field. And if there is a "select" tag field for the address, one must be selected. If none of the address options apply, map to the most appropriate key. For example, if there is a "select" field for the prefecture, the next input field should not contain the prefecture.
 - Name input may be separated into first and last.
-- In the furigana section, always check whether it is hiragana or katakana.
-- Mapping the characters displayed in the html, not the "name" of the field, as important.
+- In the field related to furigana, if furigana is written in katakana such as "フリガナ", map katakana; if in hiragana such as "ふりがな", map hiragana, and never mapping kanji.
+- Mapping the characters displayed in the html, not the "name" of the field, as important. Similarly, data used for inqueries should be mapped based on value, not only key name.
 - The html often shows example inputs, so be sure to refer to them for mapping.
 
 The output should look like this:
-{"fields":[{"name":"lastname_kana","tag":"input","type":"text","value":"last_name_kana"},{"name":"company","tag":"input","type":"text","value":"company_name"},{"name":"select_field","tag":"select","values":["a","b","c"],"value":"b"},{"name":"checkbox_field","tag":"input","type":"checkbox","values":["one","two"],"value":"one"},…]}
+{"fields":[{"name":"lastname_kana","tag":"input","type":"text","value":"last_name_kana"},{"name":"company","tag":"input","type":"text","value":"company_name"},{"name":"select_field","tag":"select","values":["a","b","c"],"value":"b"},{"name":"checkbox_field","tag":"input","type":"checkbox","values":["one","two","three"],"value":"threeZ"},…]}
 `
   console.log("prompt", prompt);
   return prompt;
