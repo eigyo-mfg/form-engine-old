@@ -298,6 +298,11 @@ function removeAttributes(html) {
     }
   });
 
+  // optionタグは多くなる可能性がありプロンプトが長くなることと、optionの情報は別で渡しているため削除する
+  $('option').remove();
+  // scriptタグは不要のため削除する
+  $('script').remove();
+
   let cleanedHtml = $.html();
   cleanedHtml = cleanedHtml.replace(/\n\s*\n/g, '\n'); // remove empty lines
   cleanedHtml = cleanedHtml.replace(/>\s+</g, '><'); // remove spaces between tags
