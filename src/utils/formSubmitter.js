@@ -58,7 +58,7 @@ async function handleFieldInput(page, field, sendValue) {
   }
 
   // フィールドのタイプに応じて処理を分岐
-  await setField(page, selector, field.tag, field.type, sendValue);
+  await setField(page, selector, field.tag, field.name, field.type, sendValue);
 
   // 1秒から2秒のランダムな待機時間を追加(自動入力待機など)
   const milliseconds = Math.floor(Math.random() * 1000) + 1000;
@@ -103,6 +103,8 @@ async function submitForm(page, submit) {
       return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND;
     });
     console.log("submitSelector", submitSelector);
+    const submitSelectorValue = await page.$eval(submitSelector, el => el.value);
+    console.log("submitSelectorValue", submitSelectorValue);
     return INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG;
   }
 
