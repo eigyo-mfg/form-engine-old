@@ -63,12 +63,15 @@ ${formattedFormHTML}
 
 Analyze the following form fields and inquiries data. Create a mapping between the form fields 'name' attribute and the corresponding keys in the inquiries data. The result should be added as a "value" field in the form field data. 
 Please note, the "value" field should contain the key from the inquiries data that corresponds to the form field, not the actual value from the inquiries data.
-As an exception, if the field type is 'select', 'checkbox' or 'radio', the value field must be set to the most applicable choice from the values instead of mapping keys.
+If the field "type" is 'select', 'checkbox' or 'radio', the "value" field must be set to the most applicable choice from the "values" field instead of mapping keys.
 Remove the 'html' fields from the output and present the results in JSON format.
 
-Please be aware that addresses may be split into separate fields,
-names may be separated into first and last,
-and entries may require specific formats such as katakana or hiragana.
+Observe the following points when creating the mapping:
+- Addresses may be distributed across multiple fields. Also, no part of the address may overlap with another field.
+- Name input may be separated into first and last.
+- In the furigana section, always check whether it is hiragana or katakana.
+- Mapping the characters displayed in the html, not the "name" of the field, as important.
+- The html often shows example inputs, so be sure to refer to them for mapping.
 
 The output should look like this:
 {"fields":[{"name":"lastname_kana","tag":"input","type":"text","value":"last_name_kana"},{"name":"company","tag":"input","type":"text","value":"company_name"},{"name":"select_field","tag":"select","values":["a","b","c"],"value":"b"},{"name":"checkbox_field","tag":"input","type":"checkbox","values":["one","two"],"value":"one"},…]}
