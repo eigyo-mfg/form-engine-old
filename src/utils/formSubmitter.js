@@ -1,5 +1,7 @@
-const {takeScreenshot, setField} = require('./puppeteer');
-const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG} = require('./result');
+const {takeScreenshot, setField, waitForSelector} = require('./puppeteer');
+const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG,
+  INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND
+} = require('./result');
 
 /**
  * 全フィールドに対して入力処理を行う関数
@@ -95,12 +97,21 @@ async function submitForm(page, submit) {
 
   // デバッグの場合は送信処理をスキップ
   if (process.env.DEBUG === 'true') {
+    console.log('Not submit for debug')
+    const submitSelector = getSelector(submit, 'type', true);
+    await waitForSelector(page, submitSelector).catch(() => {
+      return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND;
+    });
+    console.log("submitSelector", submitSelector);
     return INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG;
   }
 
   try {
     const submitSelector = getSelector(submit, 'type', true);
     console.log("submitSelector", submitSelector);
+    await waitForSelector(page, submitSelector).catch(() => {
+      return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND;
+    });
     // MutationObserverをセット
     await setupCheckThanksMutationObserver(page);
     // 送信ボタンクリック

@@ -193,6 +193,10 @@ async function setField(page, selector, tag, type, value){
   }
 }
 
+async function waitForSelector(page, selector, timeout = 5000) {
+    await page.waitForSelector(selector, {timeout: timeout});
+}
+
 module.exports = {
   launchBrowser,
   newPage,
@@ -201,4 +205,5 @@ module.exports = {
   takeScreenshot,
   getLongestElementHtml,
   setField,
+  waitForSelector,
 };
