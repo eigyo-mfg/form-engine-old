@@ -292,9 +292,19 @@ function removeAttributes(html) {
   const $ = cheerio.load(html, {decodeEntities: false});
 
   $('*').each(function() {
-    const attrs = this.attribs;
-    for (let attr in attrs) {
-      $(this).removeAttr(attr);
+    const isCheckboxOrRadio = $(this).is('input[type=checkbox]') || $(this).is('input[type=radio]');
+    const isField = $(this).is('input') || $(this).is('textarea') || $(this).is('select');
+    const attrs = this.attributes;
+    for(let attr of attrs) {
+      // チェックボックスとラジオの場合はvalue属性を残す
+      if ((isCheckboxOrRadio && attr.name === 'value')) {
+        continue;
+      }
+      // フィールドの場合はname属性を残す
+      if (isField && attr.name === 'name') {
+        continue;
+      }
+      $(this).removeAttr(attr.name);
     }
   });
 
