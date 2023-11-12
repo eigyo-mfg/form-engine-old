@@ -129,6 +129,7 @@ function getSymbol(inputResult, result) {
 }
 
 async function updateSpreadsheet(range, values) {
+  console.log('updateSpreadsheet:', range, values)
   const request = {
     spreadsheetId: SPREADSHEET_ID,
     range: range,

@@ -43,10 +43,7 @@ async function saveResultToFirestore(url, formData, submissionData) {
  */
 async function saveResultToSpreadsheet(url, inputResult, result, ssData) {
   try {
-    // const rowNumber = await getRowNumberForUrl(url); // URLに対応する行番号を取得
-    // if (rowNumber === null) return; // 行が見つからない場合、処理を終了
     const rowNumber = ssData.rowNumber;
-
     const symbol = getSymbol(inputResult, result); // 結果を記号に直す
     const date = TimeManager.getInstance().getFormattedDate();
 
