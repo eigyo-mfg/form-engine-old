@@ -313,9 +313,10 @@ function removeAttributes(html) {
   // scriptタグは不要のため削除する
   $('script').remove();
 
-  let cleanedHtml = $.html();
-  cleanedHtml = cleanedHtml.replace(/\n\s*\n/g, '\n'); // remove empty lines
-  cleanedHtml = cleanedHtml.replace(/>\s+</g, '><'); // remove spaces between tags
+  const cleanedHtml = $.html()
+      .replace(/\n\s*\n/g, '\n') // remove empty lines
+      .replace(/>\s+</g, '><') // remove spaces between tags
+      .replace(/<!--[\s\S]*?-->/g, ''); // remove comments
   return cleanedHtml;
 }
 
