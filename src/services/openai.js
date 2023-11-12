@@ -68,7 +68,7 @@ Remove the 'html' fields from the output and present the results in JSON format.
 The fields entries must not be deleted.
 
 Observe the following points when creating the mapping:
-- Addresses may be distributed across multiple fields. Also, no part of the address, including the "select" tag field, may overlap with another field. And if there is a "select" tag field for the address, one must be selected. If none of the address options apply, map to the most appropriate key. If the "select" field after selecting a prefecture has a choice containing "区", then "address_city_ward" is mapped. For example, if there is a "select" field for the prefecture, the next input field should not contain the prefecture. 
+- Addresses may be distributed across multiple fields. Also, no part of the address, including the "select" tag field, may overlap with another field. And if there is a "select" tag field for the address, one must be selected. If none of the address options apply, map to the most appropriate key. If the "select" field after selecting a prefecture has a choice containing "区", then "address_city_ward" is mapped. The address field at the end always includes the name of the building. For example, if there is a "select" field for the prefecture, the next input field should not contain the prefecture. 
 - Name input may be separated into first and last.
 - In the field related to furigana, if furigana is written in katakana such as "フリガナ", map katakana; if in hiragana such as "ふりがな", map hiragana, and never mapping kanji.
 - Mapping the characters displayed in the html, not the "name" of the field, as important. Similarly, data used for inqueries should be mapped based on value, not only key name.
