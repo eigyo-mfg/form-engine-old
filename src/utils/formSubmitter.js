@@ -8,16 +8,17 @@ const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DE
  * @param {object} page
  * @param {object} formData
  * @param {object} inputData
+ * @param {object} iframe
  * @return {Promise<void>}
  */
-async function fillFormFields(page, formData, inputData) {
+async function fillFormFields(page, formData, inputData, iframe) {
   console.log('fillFormFields');
   for (const field of formData.fields) {
     if (!field.name) {
       console.warn('No name found for field:', field)
       continue;
     }
-    if (!field.value) {
+    if (!field.value && field.value !== "") {
       console.warn('No value found for field:', field)
       continue;
     }
@@ -33,7 +34,7 @@ async function fillFormFields(page, formData, inputData) {
       continue;
     }
     // フィールドに値がある場合、入力処理を行う
-    await handleFieldInput(page, field, sendValue);
+    await handleFieldInput(page, field, sendValue, iframe);
   }
 }
 
@@ -42,14 +43,16 @@ async function fillFormFields(page, formData, inputData) {
  * @param {object} page
  * @param {object} field
  * @param {string} sendValue
+ * @param {object} iframe
  * @return {Promise<void>}
  */
-async function handleFieldInput(page, field, sendValue) {
+async function handleFieldInput(page, field, sendValue, iframe) {
   const selector = getSelector(field); // セレクタを取得
   console.log(
       'Handling field:', field.name,
       'Selector:', selector,
       'Value:', sendValue,
+      'IsIframe:', iframe.isIn,
   );
   // セレクタがnullの場合、処理をスキップ
   if (selector === null) {
@@ -58,7 +61,7 @@ async function handleFieldInput(page, field, sendValue) {
   }
 
   // フィールドのタイプに応じて処理を分岐
-  await setField(page, selector, field.tag, field.name, field.type, sendValue);
+  await setField(page, selector, field.tag, field.name, field.type, sendValue, iframe);
 
   // 1秒から2秒のランダムな待機時間を追加(自動入力待機など)
   const milliseconds = Math.floor(Math.random() * 1000) + 1000;
@@ -85,9 +88,10 @@ function getSelector(field, attr = 'name', includeFormTag = false) {
  * フォームを送信する関数
  * @param {object} page
  * @param {string} submit
+ * @param {object} iframe
  * @return {Promise<string>}
  */
-async function submitForm(page, submit) {
+async function submitForm(page, submit, iframe) {
   console.log('submitForm');
   // スクリーンショットを撮る
   await takeScreenshot(page, 'input-before-submit');
@@ -95,15 +99,16 @@ async function submitForm(page, submit) {
   await page.setViewport({width: 800, height: 600});
   await new Promise((r) => setTimeout(r, 1000));
 
+  const target = iframe.isIn ? iframe.frame : page;
   // デバッグの場合は送信処理をスキップ
   if (process.env.DEBUG === 'true') {
     console.log('Not submit for debug')
     const submitSelector = getSelector(submit, 'type', true);
-    await waitForSelector(page, submitSelector).catch(() => {
+    await waitForSelector(target, submitSelector).catch(() => {
       return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND;
     });
     console.log("submitSelector", submitSelector);
-    const submitSelectorValue = await page.$eval(submitSelector, el => el.value);
+    const submitSelectorValue = await target.$eval(submitSelector, el => el.value);
     console.log("submitSelectorValue", submitSelectorValue);
     return INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG;
   }
@@ -111,19 +116,19 @@ async function submitForm(page, submit) {
   try {
     const submitSelector = getSelector(submit, 'type', true);
     console.log("submitSelector", submitSelector);
-    await waitForSelector(page, submitSelector).catch(() => {
+    await waitForSelector(target, submitSelector).catch(() => {
       return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND;
     });
     // MutationObserverをセット
-    await setupCheckThanksMutationObserver(page);
+    await setupCheckThanksMutationObserver(target);
     // 送信ボタンクリック
-    await page.click(submitSelector);
+    await target.click(submitSelector);
     await takeScreenshot(page, 'input-submit-clicked');
 
     // 送信結果の完了を確認する(Thanksテキストが表示される or ページ遷移
     const result = await Promise.race([
-      page.waitForFunction(() => window.__mutationSuccess === true).then(() => 'mutationSuccess'),
-      page.waitForNavigation({timeout: 10000}).then(() => 'navigation'),
+      target.waitForFunction(() => window.__mutationSuccess === true).then(() => 'mutationSuccess'),
+      target.waitForNavigation({timeout: 10000}).then(() => 'navigation'),
     ]);
     console.log('result', result)
     // 成功

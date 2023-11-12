@@ -1,4 +1,4 @@
-const {handleAgreement, takeScreenshot, getLongestElementHtml} = require('./puppeteer');
+const {handleAgreement, takeScreenshot, getLongestElementHtmlAndIframeInfo} = require('./puppeteer');
 const {
   INPUT_RESULT_FORM_NOT_FOUND,
   INPUT_RESULT_ERROR,
@@ -124,7 +124,7 @@ class PageProcessor {
     await handleAgreement(this.page);
     // フォームのHTMLを返す
     // const longestFormHTML = await extractFormHTML(this.page);
-    const formHTML = await getLongestElementHtml(this.page, "form");
+    const {html: formHTML, iframe} = await getLongestElementHtmlAndIframeInfo(this.page, "form");
     if (formHTML === undefined || formHTML.length === 0) {
       console.log('No form found in the HTML. Exiting processOnInput...');
       this.inputResult = INPUT_RESULT_FORM_NOT_FOUND;
@@ -154,9 +154,9 @@ class PageProcessor {
     // フォーム入力用データをフォーマット
     formatAndLogFormData(formMappingGPTResult, inputData);
     // フォームに入力
-    await fillFormFields(this.page, formMappingGPTResult, inputData);
+    await fillFormFields(this.page, formMappingGPTResult, inputData, iframe);
     // フォームを送信
-    await submitForm(this.page, this.submit)
+    await submitForm(this.page, this.submit, iframe)
         .then((result) => {
           console.log('Submit result:', result);
           this.inputResult = result;

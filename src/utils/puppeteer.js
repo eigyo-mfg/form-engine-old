@@ -118,7 +118,7 @@ async function takeScreenshot(page, stage = '') {
  * @param {string} tagName
  * @return {Promise<string>}
  */
-async function getLongestElementHtml(page, tagName) {
+async function getLongestElementHtmlAndIframeInfo(page, tagName) {
     // ページ全体で最長の要素を取得します
     let longestElementHtml = await page.evaluate((tag) => {
       const elements = Array.from(document.getElementsByTagName(tag));
@@ -136,6 +136,12 @@ async function getLongestElementHtml(page, tagName) {
     }, tagName);
 
     // ページ全体で最長の要素が存在しない場合、iframe内をチェックします
+    let iframe = {
+      isIn: false,
+      frame: null,
+      url: '',
+      name: '',
+    };
     if (!longestElementHtml) {
       const frames = await page.frames();
       for (const frame of frames) {
@@ -153,48 +159,63 @@ async function getLongestElementHtml(page, tagName) {
           }
           return longestElement.outerHTML;
         }, tagName);
-        if (longestElementHtml) break;
+        if (longestElementHtml) {
+          iframe = {
+            isIn: true,
+            frame: frame,
+            url: frame.url(),
+            name: frame.name(),
+          }
+          break;
+        }
       }
     }
-    return longestElementHtml;
+    return {
+      html: longestElementHtml,
+      iframe: iframe,
+    };
 }
 
-async function setField(page, selector, tag, name, type, value){
+async function setField(page, selector, tag, name, type, value, iframe){
+  // iframe内の場合はiframe内の要素を操作する
+  const target = iframe.isIn ? iframe.frame : page;
   if (tag === 'input') {
     if (type === 'radio') {
-      await page.click(`${tag}[name="${name}"][value="${value}"]`); // ラジオボタンを選択
+      console.log(`${tag}[name="${name}"][value="${value}"]`, 'click');
+      await target.click(`${tag}[name="${name}"][value="${value}"]`); // ラジオボタンを選択
     } else if (type === 'checkbox') {
       // 一旦全てのチェックボックスのチェックを外す
-      const checkboxes = await page.$$(selector);
+      const checkboxes = await target.$$(selector);
       for (let checkbox of checkboxes) {
-        let isChecked = await page.evaluate(el => el.checked, checkbox);
+        let isChecked = await target.evaluate(el => el.checked, checkbox);
         // チェックされてたらクリック
         if (isChecked) {
           await checkbox.click();
         }
       }
+      console.log(`${tag}[name="${name}"][value="${value}"]`, 'click');
       // 全てのチェックボックスが外れた後、対象のチェックボックスをクリック
-      await page.click(`${tag}[name="${name}"][value="${value}"]`);
+      await target.click(`${tag}[name="${name}"][value="${value}"]`);
     } else {
       // 現在の値を取得
-      const currentValue = await page.$eval(selector, (el) => el.value);
+      const currentValue = await target.$eval(selector, (el) => el.value);
       // 現在の値が送信する値と同じであればスキップ
       if (currentValue === value) {
         return;
       }
       if (currentValue !== '') {
         // 現在の値をクリア
-        await page.$eval(selector, (el) => (el.value = ''));
+        await target.$eval(selector, (el) => (el.value = ''));
       }
-      await page.type(selector, value); // 値を入力
+      await target.type(selector, value); // 値を入力
     }
   } else if (tag === 'textarea') {
-    await page.focus(selector); // テキストエリアにフォーカスを当てる
-    await page.$eval(selector, (el) => (el.value = '')); // 現在の値をクリア
-    await page.type(selector, value); // 新しい値を入力
+    await target.focus(selector); // テキストエリアにフォーカスを当てる
+    await target.$eval(selector, (el) => (el.value = '')); // 現在の値をクリア
+    await target.type(selector, value); // 新しい値を入力
   } else if (tag === 'select') {
     // セレクトボックスを選択
-    await page.select(selector, value);
+    await target.select(selector, value);
   }
 }
 
@@ -208,7 +229,7 @@ module.exports = {
   goto,
   handleAgreement,
   takeScreenshot,
-  getLongestElementHtml,
+  getLongestElementHtmlAndIframeInfo,
   setField,
   waitForSelector,
 };
