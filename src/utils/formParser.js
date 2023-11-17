@@ -89,94 +89,6 @@ async function extractFormHTML(page) {
   return longestFormHTML; // 最長のフォームHTMLを返す
 }
 
-function analyzeFields(longestFormHTML) {
-  const $ = cheerio.load(longestFormHTML);
-  const fields = [];
-
-  const parseField = (el, type) => {
-    const name = $(el).attr('name') || $(el).attr('id') || $(el).attr('class');
-    const value = name;
-    const placeholder = $(el).attr('placeholder') || '';
-
-    let additionalInfo = $(el).next('small').text().trim() || '';
-    if (!additionalInfo) {
-      additionalInfo = $(el).next('span').text().trim() || '';
-    }
-    if (!additionalInfo) {
-      additionalInfo = $(el).parent().find('small').text().trim() || '';
-    }
-    if (!additionalInfo) {
-      additionalInfo = $(el).closest('.item-input').find('.small-txt').text().trim() || '';
-    }
-    if (!additionalInfo) {
-      let parentText = $(el).closest('.item-input').text().trim();
-      let selfText = '';
-      if ($(el).val() !== undefined) {
-        selfText = $(el).val().trim();
-      } else if ($(el).attr('placeholder') !== undefined) {
-        selfText = $(el).attr('placeholder').trim();
-      }
-      additionalInfo = parentText.replace(selfText, '').trim();
-    }
-
-    let label = $(`label[for="${name}"]`).text() || $(`label[for="${$(el).attr('id')}"]`).text() || '';
-    if (label === '') {
-      label = $(el).parent('label').text() || '';
-    }
-
-    const field = { name: value, value: name, type: type };
-
-    if (label) field.label = label;
-    if (placeholder) field.placeholder = placeholder;
-    if (additionalInfo) field.additionalInfo = additionalInfo;
-
-    if (type === "radio" || type === "checkbox") {
-      const selectValue = $(el).attr('value');
-      const existingField = fields.find(field => field.name === value && field.type === type);
-      if (existingField) {
-        existingField.values.push({ selectValue: selectValue, label: label });
-      } else {
-        field.values = [{ selectValue: selectValue, label: label }];
-        fields.push(field);
-      }
-    } else {
-      fields.push(field);
-    }
-  };
-
-  $('input[type="text"], input[type="email"], input[type="date"], input[type="month"], input[type="number"], input[type="tel"], input[type="time"], input[type="url"], input[type="week"], textarea').each(function() {
-    parseField(this, $(this).attr('type') || 'textarea');
-  });
-
-  $('input[type="radio"], input[type="checkbox"]').each(function() {
-    parseField(this, $(this).attr('type'));
-  });
-
-  $('select').each(function() {
-    const name = $(this).attr('name') || $(this).attr('id') || $(this).attr('class');
-    const value = name;
-    const type = 'select';
-    const values = [];
-    $(this).find('option').each(function() {
-      values.push({selectValue: $(this).attr('value')});
-    });
-    fields.push({name: value, value: name, type: type, values: values});
-  });
-
-  const submitButton = $('button[type="submit"], input[type="submit"]');
-  const submitButtonClass = submitButton.attr('class');
-  // const submitButtonValue = submitButton.attr('value');
-  const submitButtonName = submitButton.attr('name');
-  const submitType = submitButtonName ?
-      ($(`input[name="${submitButtonName}"]`).length > 0 ? 'input' : 'button'):
-      (submitButton.is('button') ? 'button' : 'input');
-  const submit = submitButtonClass ?
-      `${submitType}.${submitButtonClass.split(' ').join('.')}[type="submit"]` :
-      `${submitType}[type="submit"]`;
-
-  return {fields, submit};
-}
-
 /**
  * formDataを整形する関数
  * @param {object} formData
@@ -300,8 +212,8 @@ function removeAttributes(html) {
       if ((isCheckboxOrRadio && attr.name === 'value')) {
         continue;
       }
-      // フィールドの場合はname属性を残す
-      if (isField && attr.name === 'name') {
+      // フィールドの場合はnameとplaceholder属性を残す
+      if (isField && (attr.name === 'name' || attr.name === 'placeholder')) {
         continue;
       }
       $(this).removeAttr(attr.name);
