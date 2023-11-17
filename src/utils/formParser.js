@@ -126,8 +126,8 @@ function getFieldsAndSubmit(formHtml) {
   });
   fields = mergeFields(fields);
 
-  console.log('fields', fields);
-  const submit = getSubmitInfo($('button[type="submit"], input[type="submit"]'));
+  const submitEl = getSubmitElement(formHtml);
+  const submit = getSubmitInfo(submitEl);
 
   return {fields, submit}
 }
@@ -181,6 +181,24 @@ function mergeFields(fields) {
     }
   })
   return results
+}
+
+function getSubmitElement(formHtml) {
+  const $ = cheerio.load(formHtml);
+  let submitEl = $('button[type="submit"], input[type="submit"]');
+  if (submitEl.length > 0) {
+    return submitEl;
+  }
+  console.warn('No submit button found. Trying to find submit link...');
+  const submitTexts = ['送信', '確認', '申込', '次へ', '進む'];
+  // 全てのaタグのテキストを検証して、対象があれば送信ボタンとして扱う
+  $('a').each((_, el) => {
+    const text = $(el).text();
+    if (submitTexts.some((submitText) => text.includes(submitText))) {
+      submitEl = $(el);
+    }
+  });
+  return submitEl;
 }
 
 function getSubmitInfo(el) {
