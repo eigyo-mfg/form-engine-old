@@ -194,8 +194,10 @@ async function setField(page, selector, tag, name, type, value, iframe){
         }
       }
       console.log(`${tag}[name="${name}"][value="${value}"]`, 'click');
+      await waitForSelector(target, `${tag}[name="${name}"][value="${value}"]`)
       // 全てのチェックボックスが外れた後、対象のチェックボックスをクリック
       await target.click(`${tag}[name="${name}"][value="${value}"]`);
+      console.log(`${tag}[name="${name}"][value="${value}"]`, 'clicked');
     } else {
       // 現在の値を取得
       const currentValue = await target.$eval(selector, (el) => el.value);

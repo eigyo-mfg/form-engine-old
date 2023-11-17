@@ -52,7 +52,6 @@ async function handleFieldInput(page, field, sendValue, iframe) {
       'Handling field:', field.name,
       'Selector:', selector,
       'Value:', sendValue,
-      'IsIframe:', iframe.isIn,
   );
   // セレクタがnullの場合、処理をスキップ
   if (selector === null) {
