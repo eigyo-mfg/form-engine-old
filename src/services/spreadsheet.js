@@ -49,6 +49,8 @@ async function fetchInputData() {
   const rows = await fetchSpreadsheetData(range);
   const data = parseRowData(rows);
   console.log('parseRowData:', data);
+  // 空入力用のデータを追加
+  data.nothing_else = "";
   return data;
 }
 
