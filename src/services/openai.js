@@ -71,8 +71,9 @@ Observe the following points when creating the mapping:
 - Addresses may be distributed across multiple fields. Also, no part of the address, including the "select" tag field, may overlap with another field. And if there is a "select" tag field for the address, one must be selected. If none of the address options apply, map to the most appropriate key. If the "select" field after selecting a prefecture has a choice containing "区", then "address_city_ward" is mapped. The address field at the end always includes the name of the building. For example, if there is a "select" field for the prefecture, the next input field should not contain the prefecture. 
 - Name input may be separated into first and last.
 - In the field related to furigana, if furigana is written in katakana such as "フリガナ", map katakana; if in hiragana such as "ふりがな", map hiragana, and never mapping kanji.
-- Mapping the characters displayed in the html, not the "name" of the field, as important. Similarly, data used for inqueries should be mapped based on value, not only key name.
+- Mapping the characters displayed in the html, not the "name" of the field, as important. Similarly, data used for inquiries should be mapped based on value, not only key name.
 - The html often shows example inputs, so be sure to refer to them for mapping.
+- With the exception of email addresses, the same data should not be mapped to more than one field. However, if mapping is not possible, nothing_else should be mapped.
 
 The output should look like this:
 {"fields":[{"name":"lastname_kana","tag":"input","type":"text","value":"last_name_kana"},{"name":"company","tag":"input","type":"text","value":"company_name"},{"name":"select_field","tag":"select","values":["a","b","c"],"value":"b"},{"name":"checkbox_field","tag":"input","type":"checkbox","values":["one","two","three"],"value":"three"},…]}
