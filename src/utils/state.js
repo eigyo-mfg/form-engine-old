@@ -1,7 +1,7 @@
 const {requestDetermineState} = require("../services/openai");
-const {generateFormsDocumentId} = require("../services/firestore");
 const {extractJson} = require("./string");
 const {removeAttributes, removeHeaderFooterSidebar} = require("./formParser");
+const {INPUT_RESULT_FORM_INPUT_FORMAT_INVALID, INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND, CONFIRM_RESULT_ERROR} = require("./result");
 const STATE_UNKNOWN = 'UNKNOWN';
 const STATE_INPUT = 'INPUT';
 const STATE_CONFIRM = 'CONFIRM';
@@ -9,15 +9,115 @@ const STATE_COMPLETE = 'COMPLETE';
 const STATE_ERROR = 'ERROR';
 const STATE_DONE = 'DONE';
 
-async function currentState(page, fields, formId) {
+/**
+ * 現在の状態を取得する
+ * @param {Page} page
+ * @param {object} fields
+ * @param {string} lastStateUrl
+ * @param {string} inputResult
+ * @param {string} confirmResult
+ * @param {string} formId
+ * @returns {Promise<string>}
+ */
+async function currentState(page, fields, lastStateUrl, inputResult, confirmResult, formId) {
+  // デバッグモードの場合は、送信処理を行わなず、入力状態から変わらずにエラーになるので、完了状態を返す
+  if (process.env.DEBUG === 'true') {
+    console.log('Complete for debug')
+    return STATE_COMPLETE;
+  }
+
+  // inputで失敗している場合は、エラー状態を返す
+  if (inputResult === INPUT_RESULT_FORM_INPUT_FORMAT_INVALID ||
+      inputResult === INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND) {
+    return STATE_ERROR;
+  }
+  // confirmで失敗している場合は、エラー状態を返す
+  if (confirmResult === CONFIRM_RESULT_ERROR) {
+    return STATE_ERROR;
+  }
+
+  // URLから状態を判定する
+  const stateByUrl = await checkStateByUrl(page, lastStateUrl);
+  if (stateByUrl !== null) {
+    return stateByUrl;
+  }
+
+  // 送信ボタンを取得
+  const submitElements = await getSubmitButtons(page);
+  // エラー状態か確認する
+  const isError = await checkErrorState(page, submitElements);
+  if (isError) {
+    return STATE_ERROR;
+  }
+
+  // ChatGPTで使うHTMLコンテンツを取得
   const cleanedHtmlTextContent = await cleanHtmlContent(page);
   console.log("cleanedHtmlTextContent:", cleanedHtmlTextContent);
-  const { isAllTextFieldsExist, isAllTextFieldHiddenOrReadonly } = await checkTextFields(page, fields);
-  const hasSubmitButton = await checkSubmitButton(page);
-  const currentState = await determineState(page, cleanedHtmlTextContent, isAllTextFieldsExist, isAllTextFieldHiddenOrReadonly, hasSubmitButton, formId);
-  console.log(currentState);
-  return currentState;
+
+  // GPT-3.5を使用して状態を判定
+  return determineStateWithChatGPT(page, cleanedHtmlTextContent, formId);
 }
+
+/**
+ * URLから状態を判定する
+ * @param {Page} page
+ * @param {string} lastStateUrl
+ * @returns {Promise<string>}
+ */
+async function checkStateByUrl(page, lastStateUrl){
+  // URLが変わっているか確認する
+  const currentUrl = page.url();
+  if (currentUrl === lastStateUrl) {
+    return null;
+  }
+  // URLに特定の文字列が含まれるか確認
+  const urlStates = [
+    { urls: ['confirm', 'check'], state: STATE_CONFIRM },
+    { urls: ['complete', 'thanks', 'finish', 'done'], state: STATE_COMPLETE },
+  ];
+  for (let urlState of urlStates) {
+    if (urlState.urls.some(url => currentUrl.includes(url))) {
+      return urlState.state;
+    }
+  }
+  return null;
+}
+
+/**
+ * エラー状態か確認する
+ * @param {Page} page
+ * @param {Array<Element>} submitElements
+ * @returns {Promise<boolean>}
+ */
+async function checkErrorState(page, submitElements) {
+  if (submitElements.length !== 0) {
+    // submitボタンのテキスト取得
+    const submitButtonTexts = await getSubmitButtonText(submitElements);
+    // submitボタンのテキストに、「確認」または「次へ」が含まれるか
+    const confirmTexts = ['確認', '次へ'];
+    if (submitButtonTexts.some(text => confirmTexts.some(confirmText => text.includes(confirmText)))) {
+      // submitボタンのテキストに、「送信」が含まれるか
+      if (!submitButtonTexts.some(text => text.includes('送信'))) {
+        // 入力画面から変わっていない
+        return true
+      }
+    }
+  }
+
+  // :invalid要素が存在する場合は、エラー状態と判定する
+  const invalidElements = await page.$$('input:invalid');
+  return invalidElements.length !== 0;
+}
+
+// async function currentState(page, fields, formId) {
+//   const cleanedHtmlTextContent = await cleanHtmlContent(page);
+//   console.log("cleanedHtmlTextContent:", cleanedHtmlTextContent);
+//   const { isAllTextFieldsExist, isAllTextFieldHiddenOrReadonly } = await checkTextFields(page, fields);
+//   const hasSubmitButton = await checkSubmitButton(page);
+//   const currentState = await determineState(page, cleanedHtmlTextContent, isAllTextFieldsExist, isAllTextFieldHiddenOrReadonly, hasSubmitButton, formId);
+//   console.log(currentState);
+//   return currentState;
+// }
 
 // HTMLコンテンツのクリーニング
 async function cleanHtmlContent(page) {
@@ -77,9 +177,30 @@ async function checkTextFields(page, fields) {
   return { isAllTextFieldsExist, isAllTextFieldHiddenOrReadonly };
 }
 
-//送信ボタンを探す
-async function checkSubmitButton(page) {
-  return await page.$('input[type="submit"], button[type="submit"]') !== null;
+/**
+ * 送信ボタンの要素を全て取得
+ * @param {Page} page
+ * @returns {Promise<Array<Element>>}
+ */
+async function getSubmitButtons(page) {
+  const selector = 'input[type="submit"], button[type="submit"]';
+  const elements = await page.$$(selector);
+  return elements;
+}
+
+/**
+ * 送信ボタンのテキストを取得
+ * @param {Array<Element>} submitElements
+ * @returns {Promise<Array<string>>}
+ */
+async function getSubmitButtonText(submitElements){
+  // console.log('getSubmitButtonText');
+  // const submitText = await submitElement.evaluate(element => element.textContent);
+  // return submitText;
+  return Promise.all(submitElements.map(async element => {
+      const submitText = await element.evaluate(element => element.textContent);
+      return submitText;
+  }));
 }
 
 /**
