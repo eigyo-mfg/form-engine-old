@@ -225,6 +225,10 @@ async function waitForSelector(page, selector, timeout = 5000) {
     await page.waitForSelector(selector, {timeout: timeout});
 }
 
+async function waitForNavigation(page, timeout = 5000) {
+    await page.waitForNavigation({timeout: timeout});
+}
+
 module.exports = {
   launchBrowser,
   newPage,
@@ -234,4 +238,5 @@ module.exports = {
   getLongestElementHtmlAndIframeInfo,
   setField,
   waitForSelector,
+  waitForNavigation,
 };

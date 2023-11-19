@@ -1,10 +1,10 @@
-const {handleAgreement, takeScreenshot, getLongestElementHtmlAndIframeInfo} = require('./puppeteer');
+const {handleAgreement, takeScreenshot, getLongestElementHtmlAndIframeInfo, waitForNavigation} = require('./puppeteer');
 const {
   INPUT_RESULT_FORM_NOT_FOUND,
   INPUT_RESULT_ERROR,
   INPUT_RESULT_NONE,
   RESULT_SUCCESS,
-  RESULT_ERROR,
+  RESULT_ERROR, CONFIRM_RESULT_ERROR, CONFIRM_RESULT_NONE, CONFIRM_RESULT_SUCCESS,
 } = require('./result');
 const {
   formatAndLogFormData, getFieldsAndSubmit, removeAttributes,
@@ -23,9 +23,7 @@ const {
   STATE_ERROR, currentState,
 } = require('./state');
 const {generateFormsDocumentId} = require("../services/firestore");
-const MAX_ERROR = 0;
 const MAX_INPUT_TRIALS = 2;
-const MAX_TRIALS = 3;
 
 /**
  * ページの処理を行うクラス
@@ -53,6 +51,7 @@ class PageProcessor {
   constructor(page, url) {
     this.page = page;
     this.url = url;
+    this.lastStateUrl = url;
     this.formId = generateFormsDocumentId(url);
     this.state = STATE_INPUT;
     this.errorCount = 0;
@@ -62,6 +61,7 @@ class PageProcessor {
     this.fields = [];
     this.submit = '';
     this.inputResult = INPUT_RESULT_NONE;
+    this.confirmResult = CONFIRM_RESULT_NONE;
     this.formMapping = null;
     this.mappingPrompt = '';
   }
@@ -71,7 +71,7 @@ class PageProcessor {
    * @return {Promise<void>}
    */
   async pageProcess() {
-    while (this.state !== STATE_DONE && this.errorCount <= MAX_ERROR) {
+    while (this.state !== STATE_DONE && this.state !== STATE_ERROR) {
       try {
         const processState = this.state;
         switch (processState) {
@@ -93,15 +93,14 @@ class PageProcessor {
         // スクリーンショットを撮る
         await takeScreenshot(this.page, processState + '-end');
         // 状態判定
-        this.state = await currentState(this.page, this.fields, this.formId);
+        this.state = await currentState(this.page, this.fields, this.lastStateUrl, this.inputResult, this.confirmResult, this.formId);
         if (this.state === processState) {
           throw new Error('State not changed. state=' + this.state);
         }
+        this.lastStateUrl = this.page.url();
       } catch (e) {
         console.error(e);
         this.state = STATE_ERROR;
-        this.errorCount++;
-        // throw new Error(e.message) // TODO
       }
     }
   }
@@ -123,7 +122,6 @@ class PageProcessor {
     // 同意画面の処理
     await handleAgreement(this.page);
     // フォームのHTMLを返す
-    // const longestFormHTML = await extractFormHTML(this.page);
     const {html: formHTML, iframe} = await getLongestElementHtmlAndIframeInfo(this.page, "form");
     if (formHTML === undefined || formHTML.length === 0) {
       console.log('No form found in the HTML. Exiting processOnInput...');
@@ -181,7 +179,6 @@ class PageProcessor {
           'input[type="submit"], button[type="submit"]',
           {timeout: 10000},
       );
-      console.log('Wait for selectors completed');
 
       const currentURL = this.page.url();
       console.log(`Current URL before clicking: ${currentURL}`);
@@ -206,18 +203,46 @@ class PageProcessor {
             'Is button disabled?', isDisabled,
         );
 
-        if (
-          buttonText.includes('送') ||
-          buttonText.includes('内容') ||
-          buttonText.includes('確認')
-        ) {
+        // 送信ボタンか判定
+        const submitTexts = ['送'];
+        if (submitTexts.some((text) => buttonText.includes(text))) {
           console.log('Matching button found. Taking screenshot...');
           await takeScreenshot(this.page, 'confirm');
 
-          const navigationPromise = this.page.waitForNavigation({
-            timeout: 10000,
+          // body要素の変更を監視
+          this.page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+          const thanksTexts = ['有難う','有り難う','有りがとう','ありがとう','完了','送信','Thank You','Thanks'];
+          await this.page.evaluate(() => {
+            const observer = new MutationObserver(mutations => {
+              for(let mutation of mutations) {
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                  mutation.addedNodes.forEach((node) => {
+                    if (node.innerText) {
+                      console.log('Element added:', node.outerHTML);
+                      if (thanksTexts.some(thanksText => node.innerText.includes(thanksText))) {
+                        window.__mutation = true;
+                      }
+                    }
+                  });
+                }
+                if (mutation.type === 'attributes') {
+                  console.log('Attribute modified:', mutation.target.outerHTML);
+                  if (thanksTexts.some(thanksText => mutation.target.innerText.includes(thanksText))) {
+                    window.__mutation = true;
+                  }
+                }
+                if (mutation.type === 'characterData') {
+                  console.log('Text content modified:', mutation.target.textContent);
+                  if (thanksTexts.some(thanksText => mutation.target.textContent.includes(thanksText))) {
+                      window.__mutation = true;
+                  }
+                }
+              }
+            });
+            observer.observe(document.querySelector('body'), { childList: true, subtree: true });
           });
 
+          // 送信ボタンをクリック
           if (onClickAttribute) {
             console.log('Executing JavaScript click event');
             await this.page.evaluate((el) => el.click(), button); // ボタン要素をクリック
@@ -226,14 +251,20 @@ class PageProcessor {
             await button.click();
           }
 
-          await navigationPromise;
-          console.log('Navigation completed');
+          await takeScreenshot(this.page, 'confirm-clicked')
+
+          // 完了メッセージの表示か、ページ遷移を待つ
+          await Promise.race([
+            this.page.waitForFunction(() => window.__mutation === true),
+            waitForNavigation(this.page, 10000),
+          ]);
+          this.confirmResult = CONFIRM_RESULT_SUCCESS;
           break;
         }
       }
     } catch (error) {
       console.log(`An error occurred: ${error.message}`);
-      // ここでエラーハンドリングの処理を追加することができます（例：リトライ、ログを送信する等）
+      this.confirmResult = CONFIRM_RESULT_ERROR;
     }
 
     console.log('Ending processOnConfirm function');

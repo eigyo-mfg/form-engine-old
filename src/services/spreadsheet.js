@@ -1,7 +1,6 @@
 module.exports = {
   fetchInputData,
   getUrls: getSSData,
-  getRowNumberForUrl,
   getSymbol,
   updateSpreadsheet,
 };
