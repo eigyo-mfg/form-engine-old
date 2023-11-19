@@ -212,10 +212,18 @@ function getSubmitInfo(el) {
   return submit
 }
 
+/**
+ * @param {Element} el
+ * @returns {*}
+ */
 function getSelectValues(el) {
-  return el.find('option').map(function() {
-    return this.attribs.value
-  }).get();
+  // テキストに「選択」という文字列が含まれてるoptionは除外する
+  return el.find('option')
+      .filter(function() {
+        return !this.children[0].data.includes('選択');
+      }).map(function() {
+        return this.attribs.value
+      }).get();
 }
 
 function removeAttributes(html) {
@@ -223,11 +231,12 @@ function removeAttributes(html) {
 
   $('*').each(function() {
     const isCheckboxOrRadio = $(this).is('input[type=checkbox]') || $(this).is('input[type=radio]');
+    const isOption = $(this).is('option');
     const isField = $(this).is('input') || $(this).is('textarea') || $(this).is('select');
     const attrs = this.attributes;
     for(let attr of attrs) {
-      // チェックボックスとラジオの場合はvalue属性を残す
-      if ((isCheckboxOrRadio && attr.name === 'value')) {
+      // チェックボックスとラジオ、optionの場合はvalue属性を残す
+      if (((isCheckboxOrRadio || isOption) && attr.name === 'value')) {
         continue;
       }
       // フィールドの場合はnameとplaceholder属性を残す
@@ -238,8 +247,10 @@ function removeAttributes(html) {
     }
   });
 
-  // optionタグは多くなる可能性がありプロンプトが長くなることと、optionの情報は別で渡しているため削除する
-  $('option').remove();
+  // optionタグが一定以上の数の場合、削除する
+  if ($('option').length > 10) {
+    $('option').remove();
+  }
   // scriptタグは不要のため削除する
   $('script').remove();
 
