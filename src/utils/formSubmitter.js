@@ -1,6 +1,6 @@
 const {takeScreenshot, setField, waitForSelector} = require('./puppeteer');
 const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG,
-  INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND
+  INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND, INPUT_RESULT_FORM_INPUT_FORMAT_INVALID
 } = require('./result');
 
 /**
@@ -119,19 +119,26 @@ async function submitForm(page, submit, iframe) {
       return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND;
     });
     // MutationObserverをセット
-    await setupCheckThanksMutationObserver(target);
+    await setupDialogAndMutationObserver(target);
     // 送信ボタンクリック
     await target.click(submitSelector);
     await takeScreenshot(page, 'input-submit-clicked');
 
-    // 送信結果の完了を確認する(Thanksテキストが表示される or ページ遷移
+    // 送信結果の失敗・成功を確認する
+    // 成功: Thanksテキストが表示される or ページ遷移
+    // 失敗: エラーテキストが表示される or window.alertのダイアログが表示される
+    const mutationFailed = 'mutationFailed';
+    const mutationSuccess = 'mutationSuccess';
     const result = await Promise.race([
-      target.waitForFunction(() => window.__mutationSuccess === true).then(() => 'mutationSuccess'),
+      target.waitForFunction(() => window.__mutationSuccess === true).then(() => mutationSuccess),
+      target.waitForFunction(() => window.__mutationFailed === true).then(() => mutationFailed),
       target.waitForNavigation({timeout: 10000}).then(() => 'navigation'),
     ]);
-    console.log('result', result)
+    if (result === mutationFailed) {
+      return INPUT_RESULT_FORM_INPUT_FORMAT_INVALID;
+    }
     // 成功
-    return INPUT_RESULT_COMPLETE
+    return INPUT_RESULT_COMPLETE;
   } catch (e) {
     console.error(e);
     // 失敗
@@ -139,20 +146,27 @@ async function submitForm(page, submit, iframe) {
   }
 }
 
-async function setupCheckThanksMutationObserver (page) {
+async function setupDialogAndMutationObserver (page) {
   // フォームの変更を監視 TODO formの変更を確認するでいいのか検証
+  const failedTexts = ['エラー', '必須', '未入力', '入力されて', '入力して', 'できません', '誤り', '異な', '不正', '不備', 'もう一度', '問題', '漏れ', 'もれ', '選択']
+  const thanksTexts = ['有難う','有り難う','有りがとう','ありがとう','完了','送信','Thank You','Thanks'];
   await page.evaluate(() => {
     const observer = new MutationObserver(mutations => {
       for(let mutation of mutations) {
         if(['childList', 'characterData'].includes(mutation.type)) {
           let formText = document.body.innerText;
-          const thanksTexts = ['有難う','有り難う','有りがとう','ありがとう','完了','送信しました','送信されました','Thank You'];
+          window.__mutationFailed = failedTexts.some(failedText => formText.includes(failedText));
           window.__mutationSuccess = thanksTexts.some(thanksText => formText.includes(thanksText));
         }
       }
     });
     observer.observe(document.querySelector('form'), { childList: true, characterData: true, subtree: true });
   });
+  page.on('dialog', async (dialog) => {
+    console.log("Dialog Message:", dialog.message());
+    // await dialog.dismiss();
+    window.__mutationFailed = true;
+  })
 }
 
 module.exports = {
