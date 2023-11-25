@@ -114,7 +114,7 @@ function formatAndLogFormData(formData, inputData) {
 /**
  * フィールドと送信ボタンの情報を取得する
  * @param {string} formHtml
- * @returns {{fields: object[], submit: object}}
+ * @return {{fields: object[], submit: object}}
  */
 function getFieldsAndSubmit(formHtml) {
   const $ = cheerio.load(formHtml);
@@ -129,13 +129,13 @@ function getFieldsAndSubmit(formHtml) {
   const submitEl = getSubmitElement(formHtml);
   const submit = getSubmitInfo(submitEl);
 
-  return {fields, submit}
+  return {fields, submit};
 }
 
 /**
  * フィールドの情報を取得する
  * @param {Element} el
- * @returns {{name}}
+ * @return {{name}}
  */
 function getFieldInfo(el) {
   const field = {};
@@ -158,16 +158,16 @@ function getFieldInfo(el) {
     field.values = [el.attr('value')];
   }
 
-  return field
+  return field;
 }
 
 /**
  * チェックボックスとラジオのフィールドをマージする(valuesをまとめる)
  * @param fields
- * @returns {*[]}
+ * @return {*[]}
  */
 function mergeFields(fields) {
-  let results = [];
+  const results = [];
   fields.forEach((field) => {
     if (field.type === 'radio' || field.type === 'checkbox') {
       const existingField = results.find((r) => r.name === field.name && r.type === field.type);
@@ -179,8 +179,8 @@ function mergeFields(fields) {
     } else {
       results.push(field);
     }
-  })
-  return results
+  });
+  return results;
 }
 
 function getSubmitElement(formHtml) {
@@ -209,12 +209,12 @@ function getSubmitInfo(el) {
   if (tag) submit.tag = tag;
   if (type) submit.type = type;
 
-  return submit
+  return submit;
 }
 
 /**
  * @param {Element} el
- * @returns {*}
+ * @return {*}
  */
 function getSelectValues(el) {
   // テキストに「選択」という文字列が含まれてるoptionは除外する
@@ -222,7 +222,7 @@ function getSelectValues(el) {
       .filter(function() {
         return !this.children[0].data.includes('選択');
       }).map(function() {
-        return this.attribs.value
+        return this.attribs.value;
       }).get();
 }
 
@@ -234,7 +234,7 @@ function removeAttributes(html) {
     const isOption = $(this).is('option');
     const isField = $(this).is('input') || $(this).is('textarea') || $(this).is('select');
     const attrs = this.attributes;
-    for(let attr of attrs) {
+    for (const attr of attrs) {
       // チェックボックスとラジオ、optionの場合はvalue属性を残す
       if (((isCheckboxOrRadio || isOption) && attr.name === 'value')) {
         continue;

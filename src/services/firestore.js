@@ -1,5 +1,5 @@
 const {db, admin} = require('./firebase');
-const {hash} = require("../utils/crypto");
+const {hash} = require('../utils/crypto');
 
 function getLatestResultForUrl(url) {
   const submissionsCollectionRef = db.collection('submissions');
@@ -40,7 +40,7 @@ async function saveForm(docId, data) {
  * Firestoreにsubmissionを保存する
  * @param {string} formKey
  * @param {object} data
- * @returns {Promise<void>}
+ * @return {Promise<void>}
  */
 async function saveSubmission(formKey, data) {
   try {

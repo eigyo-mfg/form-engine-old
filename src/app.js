@@ -66,11 +66,11 @@ async function run(browser, ssData) {
         ssData,
         null,
         null,
-        "",
-        "",
-        "",
-        "",
-        "",
+        '',
+        '',
+        '',
+        '',
+        '',
         RESULT_ERROR,
         e.message,
     );
@@ -92,7 +92,7 @@ async function run(browser, ssData) {
  * @param {string} state
  * @param {string} result
  * @param {string} errorMessage
- * @returns {Promise<void>}
+ * @return {Promise<void>}
  */
 async function saveResult(
     url,
@@ -105,7 +105,7 @@ async function saveResult(
     mappingPrompt,
     state,
     result,
-    errorMessage = "",
+    errorMessage = '',
 ) {
   // Firestoreのformコレクションに保存するデータ
   const formData = {

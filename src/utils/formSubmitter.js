@@ -1,6 +1,6 @@
 const {takeScreenshot, setField, waitForSelector, waitForTimeout} = require('./puppeteer');
 const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG,
-  INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND, INPUT_RESULT_FORM_INPUT_FORMAT_INVALID
+  INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND, INPUT_RESULT_FORM_INPUT_FORMAT_INVALID,
 } = require('./result');
 
 /**
@@ -15,14 +15,14 @@ async function fillFormFields(page, formData, inputData, iframe) {
   console.log('fillFormFields');
   for (const field of formData.fields) {
     if (!field.name) {
-      console.warn('No name found for field:', field)
+      console.warn('No name found for field:', field);
       continue;
     }
-    if (!field.value && field.value !== "") {
-      console.warn('No value found for field:', field)
+    if (!field.value && field.value !== '') {
+      console.warn('No value found for field:', field);
       continue;
     }
-    let sendValue = (
+    const sendValue = (
         (field.type === 'radio' ||
         field.type === 'checkbox' ||
         field.tag === 'select') &&
@@ -101,18 +101,18 @@ async function submitForm(page, submit, iframe) {
   const target = iframe.isIn ? iframe.frame : page;
   // デバッグの場合は送信処理をスキップ
   if (process.env.DEBUG === 'true') {
-    console.log('Not submit for debug')
+    console.log('Not submit for debug');
     const submitSelector = getSelector(submit, 'type', true);
     await waitForSelector(target, submitSelector).catch(() => INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND);
-    console.log("submitSelector", submitSelector);
-    const submitSelectorValue = await target.$eval(submitSelector, el => el.value);
-    console.log("submitSelectorValue", submitSelectorValue);
+    console.log('submitSelector', submitSelector);
+    const submitSelectorValue = await target.$eval(submitSelector, (el) => el.value);
+    console.log('submitSelectorValue', submitSelectorValue);
     return INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG;
   }
 
   try {
     const submitSelector = getSelector(submit, 'type', true);
-    console.log("submitSelector", submitSelector);
+    console.log('submitSelector', submitSelector);
     await waitForSelector(target, submitSelector).catch(() => INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND);
     // MutationObserverをセット
     await setupDialogAndMutationObserver(target);
@@ -128,7 +128,7 @@ async function submitForm(page, submit, iframe) {
     const result = await Promise.race([
       target.waitForFunction(() => window.__mutationSuccess === true).then(() => mutationSuccess),
       target.waitForFunction(() => window.__mutationFailed === true).then(() => mutationFailed),
-      target.waitForNavigation({timeout: 3000}).then(() => 'navigation'),
+      target.waitForNavigation({timeout: 10000}).then(() => 'navigation'),
       waitForTimeout(target, 5000).then(() => 'timeout'),
     ]);
     if (result === mutationFailed) {
@@ -144,27 +144,27 @@ async function submitForm(page, submit, iframe) {
   }
 }
 
-async function setupDialogAndMutationObserver (page) {
+async function setupDialogAndMutationObserver(page) {
   // フォームの変更を監視 TODO formの変更を確認するでいいのか検証
-  const failedTexts = ['エラー', '必須', '未入力', '入力されて', '入力して', 'できません', '誤り', '異な', '不正', '不備', 'もう一度', '問題', '漏れ', 'もれ', '選択']
-  const thanksTexts = ['有難う','有り難う','有りがとう','ありがとう','完了','送信','Thank You','Thanks'];
+  const failedTexts = ['エラー', '必須', '未入力', '入力されて', '入力して', 'できません', '誤り', '異な', '不正', '不備', 'もう一度', '問題', '漏れ', 'もれ', '選択'];
+  const thanksTexts = ['有難う', '有り難う', '有りがとう', 'ありがとう', '完了', '送信', 'Thank You', 'Thanks'];
   await page.evaluate(() => {
-    const observer = new MutationObserver(mutations => {
-      for(let mutation of mutations) {
-        if(['childList', 'characterData'].includes(mutation.type)) {
-          let formText = document.body.innerText;
-          window.__mutationFailed = failedTexts.some(failedText => formText.includes(failedText));
-          window.__mutationSuccess = thanksTexts.some(thanksText => formText.includes(thanksText));
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (['childList', 'characterData'].includes(mutation.type)) {
+          const formText = document.body.innerText;
+          window.__mutationFailed = failedTexts.some((failedText) => formText.includes(failedText));
+          window.__mutationSuccess = thanksTexts.some((thanksText) => formText.includes(thanksText));
         }
       }
     });
-    observer.observe(document.querySelector('form'), { childList: true, characterData: true, subtree: true });
+    observer.observe(document.querySelector('form'), {childList: true, characterData: true, subtree: true});
   });
   page.on('dialog', async (dialog) => {
-    console.log("Dialog Message:", dialog.message());
+    console.log('Dialog Message:', dialog.message());
     // await dialog.dismiss();
     window.__mutationFailed = true;
-  })
+  });
 }
 
 module.exports = {

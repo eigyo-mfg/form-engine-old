@@ -104,8 +104,8 @@ async function takeScreenshot(page, stage = '') {
   const tm = TimeManager.getInstance();
   const dateTime = tm.getFormattedISOString();
   const ssDir = process.env.SCREENSHOT_DIRECTORY || './screenshot';
-  if (!fs.existsSync(ssDir)){
-    fs.mkdirSync(ssDir, { recursive: true });
+  if (!fs.existsSync(ssDir)) {
+    fs.mkdirSync(ssDir, {recursive: true});
   }
   const screenshotPath = `${ssDir}/${domainName}_${dateTime}_${stage}.png`;
 
@@ -119,64 +119,64 @@ async function takeScreenshot(page, stage = '') {
  * @return {Promise<string>}
  */
 async function getLongestElementHtmlAndIframeInfo(page, tagName) {
-    // ページ全体で最長の要素を取得します
-    let longestElementHtml = await page.evaluate((tag) => {
-      const elements = Array.from(document.getElementsByTagName(tag));
-      if (elements.length === 0) return null;
-      let longestElement = elements[0];
-      let longestLength = longestElement.innerHTML.length;
-      for (const element of elements) {
-        const length = element.innerHTML.length;
-        if (length > longestLength) {
-          longestElement = element;
-          longestLength = length;
-        }
-      }
-      return longestElement.outerHTML;
-    }, tagName);
-
-    // ページ全体で最長の要素が存在しない場合、iframe内をチェックします
-    let iframe = {
-      isIn: false,
-      frame: null,
-      url: '',
-      name: '',
-    };
-    if (!longestElementHtml) {
-      const frames = await page.frames();
-      for (const frame of frames) {
-        longestElementHtml = await frame.evaluate((tag) => {
-          const elements = Array.from(document.getElementsByTagName(tag));
-          if (elements.length === 0) return null;
-          let longestElement = elements[0];
-          let longestLength = longestElement.innerHTML.length;
-          for (const element of elements) {
-            const length = element.innerHTML.length;
-            if (length > longestLength) {
-              longestElement = element;
-              longestLength = length;
-            }
-          }
-          return longestElement.outerHTML;
-        }, tagName);
-        if (longestElementHtml) {
-          iframe = {
-            isIn: true,
-            frame: frame,
-            url: frame.url(),
-            name: frame.name(),
-          }
-          break;
-        }
+  // ページ全体で最長の要素を取得します
+  let longestElementHtml = await page.evaluate((tag) => {
+    const elements = Array.from(document.getElementsByTagName(tag));
+    if (elements.length === 0) return null;
+    let longestElement = elements[0];
+    let longestLength = longestElement.innerHTML.length;
+    for (const element of elements) {
+      const length = element.innerHTML.length;
+      if (length > longestLength) {
+        longestElement = element;
+        longestLength = length;
       }
     }
-    return {
-      html: longestElementHtml,
-      iframe: iframe,
-    };
+    return longestElement.outerHTML;
+  }, tagName);
+
+  // ページ全体で最長の要素が存在しない場合、iframe内をチェックします
+  let iframe = {
+    isIn: false,
+    frame: null,
+    url: '',
+    name: '',
+  };
+  if (!longestElementHtml) {
+    const frames = await page.frames();
+    for (const frame of frames) {
+      longestElementHtml = await frame.evaluate((tag) => {
+        const elements = Array.from(document.getElementsByTagName(tag));
+        if (elements.length === 0) return null;
+        let longestElement = elements[0];
+        let longestLength = longestElement.innerHTML.length;
+        for (const element of elements) {
+          const length = element.innerHTML.length;
+          if (length > longestLength) {
+            longestElement = element;
+            longestLength = length;
+          }
+        }
+        return longestElement.outerHTML;
+      }, tagName);
+      if (longestElementHtml) {
+        iframe = {
+          isIn: true,
+          frame: frame,
+          url: frame.url(),
+          name: frame.name(),
+        };
+        break;
+      }
+    }
+  }
+  return {
+    html: longestElementHtml,
+    iframe: iframe,
+  };
 }
 
-async function setField(page, selector, tag, name, type, value, iframe){
+async function setField(page, selector, tag, name, type, value, iframe) {
   // iframe内の場合はiframe内の要素を操作する
   const target = iframe.isIn ? iframe.frame : page;
   if (tag === 'input') {
@@ -186,15 +186,15 @@ async function setField(page, selector, tag, name, type, value, iframe){
     } else if (type === 'checkbox') {
       // 一旦全てのチェックボックスのチェックを外す
       const checkboxes = await target.$$(selector);
-      for (let checkbox of checkboxes) {
-        let isChecked = await target.evaluate(el => el.checked, checkbox);
+      for (const checkbox of checkboxes) {
+        const isChecked = await target.evaluate((el) => el.checked, checkbox);
         // チェックされてたらクリック
         if (isChecked) {
           await checkbox.click();
         }
       }
       console.log(`${tag}[name="${name}"][value="${value}"]`, 'click');
-      await waitForSelector(target, `${tag}[name="${name}"][value="${value}"]`)
+      await waitForSelector(target, `${tag}[name="${name}"][value="${value}"]`);
       // 全てのチェックボックスが外れた後、対象のチェックボックスをクリック
       await target.click(`${tag}[name="${name}"][value="${value}"]`);
       console.log(`${tag}[name="${name}"][value="${value}"]`, 'clicked');
@@ -222,15 +222,15 @@ async function setField(page, selector, tag, name, type, value, iframe){
 }
 
 async function waitForSelector(page, selector, timeout = 5000) {
-    await page.waitForSelector(selector, {timeout: timeout});
+  await page.waitForSelector(selector, {timeout: timeout});
 }
 
 async function waitForNavigation(page, timeout = 5000) {
-    await page.waitForNavigation({timeout: timeout});
+  await page.waitForNavigation({timeout: timeout});
 }
 
 async function waitForTimeout(page, timeout = 5000) {
-    await page.waitForTimeout(timeout);
+  await page.waitForTimeout(timeout);
 }
 
 module.exports = {

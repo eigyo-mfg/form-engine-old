@@ -1,5 +1,5 @@
-const {handleAgreement, takeScreenshot, getLongestElementHtmlAndIframeInfo, waitForNavigation, waitForSelector,
-  waitForTimeout
+const {handleAgreement, takeScreenshot, getLongestElementHtmlAndIframeInfo,
+  waitForTimeout,
 } = require('./puppeteer');
 const {
   INPUT_RESULT_FORM_NOT_FOUND,
@@ -25,9 +25,9 @@ const {
   STATE_COMPLETE,
   STATE_ERROR, currentState,
 } = require('./state');
-const {generateFormsDocumentId} = require("../services/firestore");
-const {isContactForm7, submitContactForm7} = require("./contactForm7");
-const {existRecaptcha} = require("./recaptcha");
+const {generateFormsDocumentId} = require('../services/firestore');
+const {isContactForm7, submitContactForm7} = require('./contactForm7');
+const {existRecaptcha} = require('./recaptcha');
 const MAX_INPUT_TRIALS = 2;
 
 /**
@@ -134,14 +134,14 @@ class PageProcessor {
     // 同意画面の処理
     await handleAgreement(this.page);
     // フォームのHTMLを返す
-    const {html: formHTML, iframe} = await getLongestElementHtmlAndIframeInfo(this.page, "form");
+    const {html: formHTML, iframe} = await getLongestElementHtmlAndIframeInfo(this.page, 'form');
     if (formHTML === undefined || formHTML.length === 0) {
       console.log('No form found in the HTML. Exiting processOnInput...');
       this.inputResult = INPUT_RESULT_FORM_NOT_FOUND;
       return;
     }
     // const {fields, submit} = analyzeFields(longestFormHTML);
-    const {fields, submit} = getFieldsAndSubmit(formHTML)
+    const {fields, submit} = getFieldsAndSubmit(formHTML);
     this.fields = fields;
     this.submit = submit;
     console.log('Fields:', fields, 'Submit:', submit);
@@ -189,10 +189,10 @@ class PageProcessor {
     try {
       const isCF7 = await isContactForm7(this.page);
       if (isCF7) {
-        console.log('Contact Form 7 found. Submitting...')
+        console.log('Contact Form 7 found. Submitting...');
         // デバッグモードの場合は、送信処理を行わない
         if (process.env.DEBUG_CONFIRM === 'true') {
-          console.log('Complete for debug-confirm')
+          console.log('Complete for debug-confirm');
           this.confirmResult = CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG;
           return;
         }
@@ -237,7 +237,7 @@ class PageProcessor {
 
           // デバッグモードの場合は、送信処理を行わない
           if (process.env.DEBUG_CONFIRM === 'true') {
-            console.log('Complete for debug')
+            console.log('Complete for debug');
             this.confirmResult = CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG;
             return;
           }
@@ -251,7 +251,7 @@ class PageProcessor {
           }
 
           // 完了メッセージの表示やページ遷移を待つために少し待つ
-          await waitForTimeout(this.page, 5000)
+          await waitForTimeout(this.page, 5000);
           await takeScreenshot(this.page, 'confirm-clicked');
           this.confirmResult = CONFIRM_RESULT_SUCCESS;
           break;

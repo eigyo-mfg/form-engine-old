@@ -34,11 +34,15 @@ $ npm run format
 │   ├── utils
 │   │   ├── array.js # array utils
 │   │   ├── cacheManager.js # キャッシュ管理
+│   │   ├── contactForm7.js # wordpressのcontactform7プラグインに関する操作
+│   │   ├── crypto.js # 暗号化処理
 │   │   ├── formParser.js # フォームの解析
 │   │   ├── formSubmitter.js # フォームの送信
 │   │   ├── pageProcessor.js # pageの一連の
+│   │   ├── recaptcha.js # reCaptchaの操作
 │   │   ├── result.js # 実行結果登録
 │   │   ├── state.js # 状態管理
+│   │   ├── string.js # 文字列処理 utils
 │   │   └── time.js # 時間管理
 │   ├── app.js # メイン処理
 ├── .env

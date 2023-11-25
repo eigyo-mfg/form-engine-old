@@ -49,7 +49,7 @@ async function fetchInputData() {
   const data = parseRowData(rows);
   console.log('parseRowData:', data);
   // 空入力用のデータを追加
-  data.nothing_else = "";
+  data.nothing_else = '';
   return data;
 }
 
@@ -62,9 +62,9 @@ async function getSSData() {
           rowNumber: index + 2, // Headerの分を+1
           url: row[0],
           result: row[1],
-        }
+        };
       })
-      .filter((row) => !row.result) // E列(results)に値がないものだけをフィルタリング; // D列()の値（URL）だけを取得
+      .filter((row) => !row.result); // E列(results)に値がないものだけをフィルタリング; // D列()の値（URL）だけを取得
   console.log('urls:', urls);
   return urls;
 }
@@ -106,10 +106,10 @@ async function getRowNumberForUrl(url) {
  * 結果を記号に変換する
  * @param {string} inputResult
  * @param {string} result
- * @returns {string}
+ * @return {string}
  */
 function getSymbol(inputResult, result) {
-  console.log("inputResult:", inputResult, "result:", result);
+  console.log('inputResult:', inputResult, 'result:', result);
   switch (inputResult) {
     case INPUT_RESULT_COMPLETE:
       switch (result) {
@@ -131,7 +131,7 @@ function getSymbol(inputResult, result) {
 }
 
 async function updateSpreadsheet(range, values) {
-  console.log('updateSpreadsheet:', range, values)
+  console.log('updateSpreadsheet:', range, values);
   const request = {
     spreadsheetId: SPREADSHEET_ID,
     range: range,

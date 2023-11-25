@@ -1,4 +1,4 @@
-const { format } = require('date-fns')
+const {format} = require('date-fns');
 
 /**
  * 時間を管理するクラス
@@ -80,7 +80,7 @@ class TimeManager {
 
   /**
    * フォーマットされた日付を取得
-   * @returns {string}
+   * @return {string}
    */
   getFormattedDate() {
     return format(this.date, 'yyyy/MM/dd HH:mm:ss');

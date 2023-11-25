@@ -1,14 +1,14 @@
 const OpenAI = require('openai');
-const {saveAIGeneratedResponse, getLatestPromptResponse, generateFormsDocumentId} = require("./firestore");
-const {hash} = require("../utils/crypto");
-const {extractJson} = require("../utils/string");
+const {saveAIGeneratedResponse, getLatestPromptResponse, generateFormsDocumentId} = require('./firestore');
+const {hash} = require('../utils/crypto');
+const {extractJson} = require('../utils/string');
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY, // defaults to process.env["OPENAI_API_KEY"]
 });
 
 // OpenAIへの共通リクエスト
 async function requestGPT(model, prompt, systemPrompt = null, formId = null) {
-  console.log("requestGPT", model, prompt, systemPrompt);
+  console.log('requestGPT', model, prompt, systemPrompt);
   const messages = [{role: 'user', content: prompt}];
   if (systemPrompt !== null) {
     messages.unshift({role: 'system', content: systemPrompt});
@@ -16,7 +16,7 @@ async function requestGPT(model, prompt, systemPrompt = null, formId = null) {
 
   // デバッグモードの場合、Firestoreから結果の取得を試みる
   if (process.env.DEBUG === 'true') {
-    const response = await getLatestPromptResponse(formId, systemPrompt, prompt)
+    const response = await getLatestPromptResponse(formId, systemPrompt, prompt);
     if (response) {
       return response.content;
     }
@@ -27,16 +27,16 @@ async function requestGPT(model, prompt, systemPrompt = null, formId = null) {
     temperature: 0,
     model: model,
   });
-  console.log("chatCompletion", chatCompletion);
+  console.log('chatCompletion', chatCompletion);
 
   // 使ったトークン数をログに残す
   const usedTokens = chatCompletion.usage.total_tokens;
-  console.log("usedTokens", usedTokens);
+  console.log('usedTokens', usedTokens);
 
   await saveAPIResult(formId, model, systemPrompt, prompt, chatCompletion, usedTokens);
 
   const chatgptResponseMessage = chatCompletion.choices[0].message.content.trim();
-  console.log("chatgptResponseMessage", chatgptResponseMessage)
+  console.log('chatgptResponseMessage', chatgptResponseMessage);
   return chatgptResponseMessage;
 }
 
@@ -77,8 +77,8 @@ Observe the following points when creating the mapping:
 
 The output should look like this:
 {"fields":[{"name":"lastname_kana","tag":"input","type":"text","value":"last_name_kana"},{"name":"company","tag":"input","type":"text","value":"company_name"},{"name":"select_field","tag":"select","values":["a","b","c"],"value":"b"},{"name":"checkbox_field","tag":"input","type":"checkbox","values":["one","two","three"],"value":"three"},…]}
-`
-  console.log("prompt", prompt);
+`;
+  console.log('prompt', prompt);
   return prompt;
 }
 
@@ -139,7 +139,7 @@ Note:
 }
 
 function formatInputForPrompt(inputData) {
-  let formatInputData = { ...inputData };
+  const formatInputData = {...inputData};
   formatInputData.inquiry_content = formatInputData.inquiry_content.substring(0, 40);
   return JSON.stringify(formatInputData);
 }
@@ -156,7 +156,7 @@ async function requestAndAnalyzeMapping(prompt, formId) {
 
   try {
     // JSON文字列を取得、パースして、マッピング情報を取得
-    const formMapping = extractJson(response)
+    const formMapping = extractJson(response);
     return formMapping;
   } catch (error) {
     console.error('Error parsing JSON:', error);
@@ -165,7 +165,7 @@ async function requestAndAnalyzeMapping(prompt, formId) {
 }
 
 async function requestDetermineState(cleanedHtmlTextContent, formId) {
-  const systemPrompt = "あなたは世界でも有数のアシスタントです。特にHTMLの解析を得意としております。";
+  const systemPrompt = 'あなたは世界でも有数のアシスタントです。特にHTMLの解析を得意としております。';
   const prompt = `このbodyのテキスト内容から、ページの状態(state)の判定結果をjson形式で返してください。もし判定できなくても必ずJSON形式で返してください。選択肢は、"complete"、"confirm"、"error"の三択です。必ずいずれかを選択してください。"complete"の特徴は、"送信完了","ありがとうございます","送信されました"というキーワードやそれに近しい文字が入っている可能性が高い。"confirm"の特徴は、確認のためにフォームの入力内容が表示されていたり、送信の確認を意味する言葉が含まれてる可能性が高い。"error"の特徴は、"エラー","必須項目が未入力です"というキーワードや類似の言葉が入っている可能性が高い。必ず次のJSONフォーマットで結果を返してください。{ "state": "complete" または "confirm" または "error", "result": "success" }  "result"に、判別ができた場合は"success"、判別できなかった場合は"failure"を入れてください。 bodyのテキスト内容は下記です。${cleanedHtmlTextContent}`;
   return await requestGPT35(prompt, systemPrompt, formId);
 }
@@ -175,7 +175,7 @@ async function saveAPIResult(formId, model, systemPrompt, prompt, chatCompletion
   const object = chatCompletion.object;
   const createdAt = new Date(chatCompletion.created * 1000);
   const usedTokens = chatCompletion.usage.total_tokens;
-  const docId = chatCompletion.id.replace("chatcmpl-", "");
+  const docId = chatCompletion.id.replace('chatcmpl-', '');
 
   const data = {
     formId: formId,

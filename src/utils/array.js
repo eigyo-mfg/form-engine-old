@@ -4,7 +4,7 @@ const DEFAULT_CHUNK_SIZE = 5;
  * 並列処理のためチャンクに分割する関数
  * @param array
  * @param size
- * @returns {*[]}
+ * @return {*[]}
  */
 function chunkArray(array, size = DEFAULT_CHUNK_SIZE) {
   const result = [];
