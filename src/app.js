@@ -54,6 +54,7 @@ async function run(browser, ssData) {
         results.fields,
         results.submit,
         results.inputResult,
+        results.confirmResult,
         results.mappingPrompt,
         results.state,
         results.result,
@@ -65,6 +66,7 @@ async function run(browser, ssData) {
         ssData,
         null,
         null,
+        "",
         "",
         "",
         "",
@@ -85,6 +87,7 @@ async function run(browser, ssData) {
  * @param {object} fields
  * @param {string} submit
  * @param {string} inputResult
+ * @param {string} confirmResult
  * @param {string} mappingPrompt
  * @param {string} state
  * @param {string} result
@@ -98,6 +101,7 @@ async function saveResult(
     fields,
     submit,
     inputResult,
+    confirmResult,
     mappingPrompt,
     state,
     result,
@@ -114,6 +118,7 @@ async function saveResult(
     errorMessage: errorMessage,
     formMappingData: formMappingData, // GPT-4が整形したマッピング
     inputResult: inputResult,
+    confirmResult: confirmResult,
     prompt: mappingPrompt,
     result: result,
     state: state,

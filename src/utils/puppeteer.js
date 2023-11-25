@@ -229,6 +229,10 @@ async function waitForNavigation(page, timeout = 5000) {
     await page.waitForNavigation({timeout: timeout});
 }
 
+async function waitForTimeout(page, timeout = 5000) {
+    await page.waitForTimeout(timeout);
+}
+
 module.exports = {
   launchBrowser,
   newPage,
@@ -239,4 +243,5 @@ module.exports = {
   setField,
   waitForSelector,
   waitForNavigation,
+  waitForTimeout,
 };

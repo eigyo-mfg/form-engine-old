@@ -2,6 +2,7 @@ const {requestDetermineState} = require("../services/openai");
 const {extractJson} = require("./string");
 const {removeAttributes, removeHeaderFooterSidebar} = require("./formParser");
 const {INPUT_RESULT_FORM_INPUT_FORMAT_INVALID, INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND, CONFIRM_RESULT_ERROR} = require("./result");
+const {isContactForm7, isSucceedSendContactForm7} = require("./contactForm7");
 const STATE_UNKNOWN = 'UNKNOWN';
 const STATE_INPUT = 'INPUT';
 const STATE_CONFIRM = 'CONFIRM';
@@ -34,6 +35,15 @@ async function currentState(page, fields, lastStateUrl, inputResult, confirmResu
   // confirmで失敗している場合は、エラー状態を返す
   if (confirmResult === CONFIRM_RESULT_ERROR) {
     return STATE_ERROR;
+  }
+
+  // Contact Form 7の場合は、完了状態を確認する
+  const isCf7 = await isContactForm7(page);
+  if (isCf7) {
+    const isSucceedSendCf7 = await isSucceedSendContactForm7(page);
+    if (isSucceedSendCf7) {
+      return STATE_COMPLETE;
+    }
   }
 
   // URLから状態を判定する
@@ -218,6 +228,11 @@ async function determineState(page, cleanedHtmlTextContent, isAllTextFieldsExist
   // デバッグモードの場合は、送信処理を行わなず、入力状態から変わらずにエラーになるので、完了状態を返す
   if (process.env.DEBUG === 'true') {
     console.log('Complete for debug')
+    return STATE_COMPLETE;
+  }
+
+  const isCf7 = await isContactForm7(this.page);
+  if (isCf7) {
     return STATE_COMPLETE;
   }
 

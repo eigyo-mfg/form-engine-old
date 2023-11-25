@@ -1,4 +1,6 @@
-const {handleAgreement, takeScreenshot, getLongestElementHtmlAndIframeInfo, waitForNavigation} = require('./puppeteer');
+const {handleAgreement, takeScreenshot, getLongestElementHtmlAndIframeInfo, waitForNavigation, waitForSelector,
+  waitForTimeout
+} = require('./puppeteer');
 const {
   INPUT_RESULT_FORM_NOT_FOUND,
   INPUT_RESULT_ERROR,
@@ -23,6 +25,7 @@ const {
   STATE_ERROR, currentState,
 } = require('./state');
 const {generateFormsDocumentId} = require("../services/firestore");
+const {isContactForm7, submitContactForm7} = require("./contactForm7");
 const MAX_INPUT_TRIALS = 2;
 
 /**
@@ -175,6 +178,14 @@ class PageProcessor {
     this.existConfirm = true;
 
     try {
+      const isCF7 = await isContactForm7(this.page);
+      if (isCF7) {
+        console.log('Contact Form 7 found. Submitting...')
+        await submitContactForm7(this.page);
+        this.confirmResult = CONFIRM_RESULT_SUCCESS;
+        return;
+      }
+
       await this.page.waitForSelector(
           'input[type="submit"], button[type="submit"]',
           {timeout: 10000},
@@ -209,39 +220,6 @@ class PageProcessor {
           console.log('Matching button found. Taking screenshot...');
           await takeScreenshot(this.page, 'confirm');
 
-          // body要素の変更を監視
-          this.page.on('console', msg => console.log('PAGE LOG:', msg.text()));
-          const thanksTexts = ['有難う','有り難う','有りがとう','ありがとう','完了','送信','Thank You','Thanks'];
-          await this.page.evaluate(() => {
-            const observer = new MutationObserver(mutations => {
-              for(let mutation of mutations) {
-                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                  mutation.addedNodes.forEach((node) => {
-                    if (node.innerText) {
-                      console.log('Element added:', node.outerHTML);
-                      if (thanksTexts.some(thanksText => node.innerText.includes(thanksText))) {
-                        window.__mutation = true;
-                      }
-                    }
-                  });
-                }
-                if (mutation.type === 'attributes') {
-                  console.log('Attribute modified:', mutation.target.outerHTML);
-                  if (thanksTexts.some(thanksText => mutation.target.innerText.includes(thanksText))) {
-                    window.__mutation = true;
-                  }
-                }
-                if (mutation.type === 'characterData') {
-                  console.log('Text content modified:', mutation.target.textContent);
-                  if (thanksTexts.some(thanksText => mutation.target.textContent.includes(thanksText))) {
-                      window.__mutation = true;
-                  }
-                }
-              }
-            });
-            observer.observe(document.querySelector('body'), { childList: true, subtree: true });
-          });
-
           // 送信ボタンをクリック
           if (onClickAttribute) {
             console.log('Executing JavaScript click event');
@@ -251,13 +229,9 @@ class PageProcessor {
             await button.click();
           }
 
-          await takeScreenshot(this.page, 'confirm-clicked')
-
-          // 完了メッセージの表示か、ページ遷移を待つ
-          await Promise.race([
-            this.page.waitForFunction(() => window.__mutation === true),
-            waitForNavigation(this.page, 10000),
-          ]);
+          // 完了メッセージの表示やページ遷移を待つために少し待つ
+          await waitForTimeout(this.page, 5000)
+          await takeScreenshot(this.page, 'confirm-clicked');
           this.confirmResult = CONFIRM_RESULT_SUCCESS;
           break;
         }
@@ -302,6 +276,7 @@ class PageProcessor {
    *  reason: null,
    *  inputData: null,
    *  inputResult: string,
+   *  confirmResult: string,
    *  submit: string,
    *  inputTrialCount: number,
    *  state: string,
@@ -319,6 +294,7 @@ class PageProcessor {
       inputTrialCount: this.inputTrials,
       inputData: this.inputData,
       inputResult: this.inputResult,
+      confirmResult: this.confirmResult,
       formMapping: this.formMapping,
       mappingPrompt: this.mappingPrompt,
       fields: this.fields,

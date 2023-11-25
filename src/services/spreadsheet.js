@@ -109,6 +109,7 @@ async function getRowNumberForUrl(url) {
  * @returns {string}
  */
 function getSymbol(inputResult, result) {
+  console.log("inputResult:", inputResult, "result:", result);
   switch (inputResult) {
     case INPUT_RESULT_COMPLETE:
       switch (result) {
