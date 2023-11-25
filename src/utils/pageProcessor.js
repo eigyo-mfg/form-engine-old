@@ -6,7 +6,7 @@ const {
   INPUT_RESULT_ERROR,
   INPUT_RESULT_NONE,
   RESULT_SUCCESS,
-  RESULT_ERROR, CONFIRM_RESULT_ERROR, CONFIRM_RESULT_NONE, CONFIRM_RESULT_SUCCESS,
+  RESULT_ERROR, CONFIRM_RESULT_ERROR, CONFIRM_RESULT_NONE, CONFIRM_RESULT_SUCCESS, INPUT_RESULT_EXIST_RECAPTCHA,
 } = require('./result');
 const {
   formatAndLogFormData, getFieldsAndSubmit, removeAttributes,
@@ -26,6 +26,7 @@ const {
 } = require('./state');
 const {generateFormsDocumentId} = require("../services/firestore");
 const {isContactForm7, submitContactForm7} = require("./contactForm7");
+const {existRecaptcha} = require("./recaptcha");
 const MAX_INPUT_TRIALS = 2;
 
 /**
@@ -119,6 +120,13 @@ class PageProcessor {
     if (this.inputTrials > MAX_INPUT_TRIALS) {
       console.log('Max processOnInput trials reached, skipping...');
       this.state = STATE_ERROR;
+      return;
+    }
+
+    const isExistRecaptcha = await existRecaptcha(this.page);
+    if (isExistRecaptcha) {
+      console.log('Recaptcha found, skipping...');
+      this.inputResult = INPUT_RESULT_EXIST_RECAPTCHA;
       return;
     }
 

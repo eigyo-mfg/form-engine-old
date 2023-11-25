@@ -1,7 +1,9 @@
 const {requestDetermineState} = require("../services/openai");
 const {extractJson} = require("./string");
 const {removeAttributes, removeHeaderFooterSidebar} = require("./formParser");
-const {INPUT_RESULT_FORM_INPUT_FORMAT_INVALID, INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND, CONFIRM_RESULT_ERROR} = require("./result");
+const {INPUT_RESULT_FORM_INPUT_FORMAT_INVALID, INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND, CONFIRM_RESULT_ERROR,
+  INPUT_RESULT_EXIST_RECAPTCHA, INPUT_RESULT_FORM_NOT_FOUND
+} = require("./result");
 const {isContactForm7, isSucceedSendContactForm7} = require("./contactForm7");
 const STATE_UNKNOWN = 'UNKNOWN';
 const STATE_INPUT = 'INPUT';
@@ -29,7 +31,9 @@ async function currentState(page, fields, lastStateUrl, inputResult, confirmResu
 
   // inputで失敗している場合は、エラー状態を返す
   if (inputResult === INPUT_RESULT_FORM_INPUT_FORMAT_INVALID ||
-      inputResult === INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND) {
+      inputResult === INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND ||
+      inputResult === INPUT_RESULT_EXIST_RECAPTCHA ||
+      inputResult === INPUT_RESULT_FORM_NOT_FOUND) {
     return STATE_ERROR;
   }
   // confirmで失敗している場合は、エラー状態を返す
