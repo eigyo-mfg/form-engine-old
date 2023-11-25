@@ -2,7 +2,8 @@ const {requestDetermineState} = require("../services/openai");
 const {extractJson} = require("./string");
 const {removeAttributes, removeHeaderFooterSidebar} = require("./formParser");
 const {INPUT_RESULT_FORM_INPUT_FORMAT_INVALID, INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND, CONFIRM_RESULT_ERROR,
-  INPUT_RESULT_EXIST_RECAPTCHA, INPUT_RESULT_FORM_NOT_FOUND
+  INPUT_RESULT_EXIST_RECAPTCHA, INPUT_RESULT_FORM_NOT_FOUND, INPUT_RESULT_COMPLETE, CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG,
+  INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG
 } = require("./result");
 const {isContactForm7, isSucceedSendContactForm7} = require("./contactForm7");
 const STATE_UNKNOWN = 'UNKNOWN';
@@ -24,7 +25,10 @@ const STATE_DONE = 'DONE';
  */
 async function currentState(page, fields, lastStateUrl, inputResult, confirmResult, formId) {
   // デバッグモードの場合は、送信処理を行わなず、入力状態から変わらずにエラーになるので、完了状態を返す
-  if (process.env.DEBUG === 'true') {
+  if (process.env.DEBUG === 'true' ||
+      (inputResult === INPUT_RESULT_COMPLETE && process.env.DEBUG_CONFIRM === 'true') ||
+      inputResult === INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG ||
+      confirmResult === CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG) {
     console.log('Complete for debug')
     return STATE_COMPLETE;
   }

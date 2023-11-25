@@ -13,6 +13,9 @@ $ npm run start
 # debug
 $ npm run debug
 
+# debug exist confirm page form
+$ npm run debug-confirm
+
 # lint
 $ npm run lint
 

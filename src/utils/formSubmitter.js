@@ -1,4 +1,4 @@
-const {takeScreenshot, setField, waitForSelector} = require('./puppeteer');
+const {takeScreenshot, setField, waitForSelector, waitForTimeout} = require('./puppeteer');
 const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG,
   INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND, INPUT_RESULT_FORM_INPUT_FORMAT_INVALID
 } = require('./result');
@@ -103,9 +103,7 @@ async function submitForm(page, submit, iframe) {
   if (process.env.DEBUG === 'true') {
     console.log('Not submit for debug')
     const submitSelector = getSelector(submit, 'type', true);
-    await waitForSelector(target, submitSelector).catch(() => {
-      return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND;
-    });
+    await waitForSelector(target, submitSelector).catch(() => INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND);
     console.log("submitSelector", submitSelector);
     const submitSelectorValue = await target.$eval(submitSelector, el => el.value);
     console.log("submitSelectorValue", submitSelectorValue);
@@ -115,9 +113,7 @@ async function submitForm(page, submit, iframe) {
   try {
     const submitSelector = getSelector(submit, 'type', true);
     console.log("submitSelector", submitSelector);
-    await waitForSelector(target, submitSelector).catch(() => {
-      return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND;
-    });
+    await waitForSelector(target, submitSelector).catch(() => INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND);
     // MutationObserverをセット
     await setupDialogAndMutationObserver(target);
     // 送信ボタンクリック
@@ -125,16 +121,18 @@ async function submitForm(page, submit, iframe) {
     await takeScreenshot(page, 'input-submit-clicked');
 
     // 送信結果の失敗・成功を確認する
-    // 成功: Thanksテキストが表示される or ページ遷移
+    // 成功: Thanksテキストが表示される or ページ遷移 or 時間経過
     // 失敗: エラーテキストが表示される or window.alertのダイアログが表示される
     const mutationFailed = 'mutationFailed';
     const mutationSuccess = 'mutationSuccess';
     const result = await Promise.race([
       target.waitForFunction(() => window.__mutationSuccess === true).then(() => mutationSuccess),
       target.waitForFunction(() => window.__mutationFailed === true).then(() => mutationFailed),
-      target.waitForNavigation({timeout: 10000}).then(() => 'navigation'),
+      target.waitForNavigation({timeout: 3000}).then(() => 'navigation'),
+      waitForTimeout(target, 5000).then(() => 'timeout'),
     ]);
     if (result === mutationFailed) {
+      console.warn('入力エラーを検知');
       return INPUT_RESULT_FORM_INPUT_FORMAT_INVALID;
     }
     // 成功

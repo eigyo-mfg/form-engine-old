@@ -7,6 +7,7 @@ const {
   INPUT_RESULT_NONE,
   RESULT_SUCCESS,
   RESULT_ERROR, CONFIRM_RESULT_ERROR, CONFIRM_RESULT_NONE, CONFIRM_RESULT_SUCCESS, INPUT_RESULT_EXIST_RECAPTCHA,
+  CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG,
 } = require('./result');
 const {
   formatAndLogFormData, getFieldsAndSubmit, removeAttributes,
@@ -189,6 +190,12 @@ class PageProcessor {
       const isCF7 = await isContactForm7(this.page);
       if (isCF7) {
         console.log('Contact Form 7 found. Submitting...')
+        // デバッグモードの場合は、送信処理を行わない
+        if (process.env.DEBUG_CONFIRM === 'true') {
+          console.log('Complete for debug-confirm')
+          this.confirmResult = CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG;
+          return;
+        }
         await submitContactForm7(this.page);
         this.confirmResult = CONFIRM_RESULT_SUCCESS;
         return;
@@ -228,6 +235,12 @@ class PageProcessor {
           console.log('Matching button found. Taking screenshot...');
           await takeScreenshot(this.page, 'confirm');
 
+          // デバッグモードの場合は、送信処理を行わない
+          if (process.env.DEBUG_CONFIRM === 'true') {
+            console.log('Complete for debug')
+            this.confirmResult = CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG;
+            return;
+          }
           // 送信ボタンをクリック
           if (onClickAttribute) {
             console.log('Executing JavaScript click event');
