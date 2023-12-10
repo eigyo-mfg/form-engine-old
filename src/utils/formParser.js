@@ -217,13 +217,11 @@ function getSubmitInfo(el) {
  * @return {*}
  */
 function getSelectValues(el) {
-  // テキストに「選択」という文字列が含まれてるoptionは除外する
+  // 空の選択肢や、テキストに「選択」という文字列が含まれてるoptionは除外する
   return el.find('option')
-      .filter(function() {
-        return !this.children[0].data.includes('選択');
-      }).map(function() {
-        return this.attribs.value;
-      }).get();
+      .filter(this.children[0].data && !this.children[0].data.includes('選択'))
+      .map(this.attribs.value)
+      .get();
 }
 
 function removeAttributes(html) {

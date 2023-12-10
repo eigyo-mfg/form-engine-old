@@ -7,7 +7,7 @@ const fs = require('fs');
  * @return {Promise<Browser>}
  */
 async function launchBrowser() {
-  const headless = process.env.DEBUG !== 'true';
+  const headless = process.env.DEBUG !== 'true' && process.env.DEBUG_CONFIRM !== 'true';
   console.log('launch browser with headless:', headless);
 
   const browser = await launch({
@@ -91,7 +91,7 @@ async function handleAgreement(page) {
  * スクリーンショットを撮る
  * @param {object} page
  * @param {string} stage
- * @return {Promise<void>}
+ * @return {Promise<string>}
  */
 async function takeScreenshot(page, stage = '') {
   const bodyHandle = await page.$('body');
@@ -110,6 +110,18 @@ async function takeScreenshot(page, stage = '') {
   const screenshotPath = `${ssDir}/${domainName}_${dateTime}_${stage}.png`;
 
   await page.screenshot({path: screenshotPath, fullPage: true});
+
+  return screenshotPath;
+}
+
+async function getLongestElement(frame, tag) {
+  return await frame.evaluate((tag) => {
+    const elements = Array.from(document.getElementsByTagName(tag));
+    if (elements.length === 0) return null;
+    return elements.reduce((longestElement, element) =>
+        element.innerHTML.length > longestElement.innerHTML.length ? element : longestElement
+    ).outerHTML;
+  }, tag);
 }
 
 /**
@@ -118,61 +130,38 @@ async function takeScreenshot(page, stage = '') {
  * @param {string} tagName
  * @return {Promise<string>}
  */
-async function getLongestElementHtmlAndIframeInfo(page, tagName) {
-  // ページ全体で最長の要素を取得します
-  let longestElementHtml = await page.evaluate((tag) => {
-    const elements = Array.from(document.getElementsByTagName(tag));
-    if (elements.length === 0) return null;
-    let longestElement = elements[0];
-    let longestLength = longestElement.innerHTML.length;
-    for (const element of elements) {
-      const length = element.innerHTML.length;
-      if (length > longestLength) {
-        longestElement = element;
-        longestLength = length;
-      }
-    }
-    return longestElement.outerHTML;
-  }, tagName);
+async function getLongestElementHtmlAndIframeInfo(page, tagName = "form") {
+  let longestElementHtml = await getLongestElement(page, tagName);
 
-  // ページ全体で最長の要素が存在しない場合、iframe内をチェックします
-  let iframe = {
+  let longestIframeElementHtml = null;
+  let iframeInfo = {
     isIn: false,
     frame: null,
     url: '',
     name: '',
   };
-  if (!longestElementHtml) {
-    const frames = await page.frames();
-    for (const frame of frames) {
-      longestElementHtml = await frame.evaluate((tag) => {
-        const elements = Array.from(document.getElementsByTagName(tag));
-        if (elements.length === 0) return null;
-        let longestElement = elements[0];
-        let longestLength = longestElement.innerHTML.length;
-        for (const element of elements) {
-          const length = element.innerHTML.length;
-          if (length > longestLength) {
-            longestElement = element;
-            longestLength = length;
-          }
-        }
-        return longestElement.outerHTML;
-      }, tagName);
-      if (longestElementHtml) {
-        iframe = {
-          isIn: true,
-          frame: frame,
-          url: frame.url(),
-          name: frame.name(),
-        };
-        break;
-      }
+
+  const frames = await page.frames();
+  for (const frame of frames) {
+    const iframeElementHtml = await getLongestElement(frame, tagName);
+    if (iframeElementHtml && (!longestIframeElementHtml || iframeElementHtml.length > longestIframeElementHtml.length)) {
+      longestIframeElementHtml = iframeElementHtml;
+      iframeInfo = {
+        isIn: true,
+        frame: frame,
+        url: frame.url(),
+        name: frame.name(),
+      };
     }
   }
+
+  if (longestIframeElementHtml && (!longestElementHtml || longestIframeElementHtml.length > longestElementHtml.length)) {
+    longestElementHtml = longestIframeElementHtml;
+  }
+
   return {
     html: longestElementHtml,
-    iframe: iframe,
+    iframe: iframeInfo,
   };
 }
 

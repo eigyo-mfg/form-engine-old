@@ -99,21 +99,22 @@ async function submitForm(page, submit, iframe) {
   await new Promise((r) => setTimeout(r, 1000));
 
   const target = iframe.isIn ? iframe.frame : page;
-  // デバッグの場合は送信処理をスキップ
-  if (process.env.DEBUG === 'true') {
-    console.log('Not submit for debug');
-    const submitSelector = getSelector(submit, 'type', true);
-    await waitForSelector(target, submitSelector).catch(() => INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND);
-    console.log('submitSelector', submitSelector);
-    const submitSelectorValue = await target.$eval(submitSelector, (el) => el.value);
-    console.log('submitSelectorValue', submitSelectorValue);
-    return INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG;
-  }
+  console.log("target is ", iframe.isIn ? "iframe" : "page");
 
   try {
     const submitSelector = getSelector(submit, 'type', true);
     console.log('submitSelector', submitSelector);
-    await waitForSelector(target, submitSelector).catch(() => INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND);
+    // await waitForSelector(target, submitSelector).catch((e) => {
+    //   console.error(e);
+    //   return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND
+    // });
+    // デバッグの場合は送信処理をスキップ
+    if (process.env.DEBUG === 'true') {
+      console.log('Not submit for debug');
+      const submitSelectorValue = await target.$eval(submitSelector, (el) => el.value);
+      console.log('submitSelectorValue', submitSelectorValue);
+      return INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG;
+    }
     // MutationObserverをセット
     await setupDialogAndMutationObserver(target);
     // 送信ボタンクリック
