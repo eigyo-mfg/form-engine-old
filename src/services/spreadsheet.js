@@ -5,23 +5,14 @@ module.exports = {
   updateSpreadsheet,
 };
 
-const {google} = require('googleapis');
-const keys = require('../../serviceAccountKey.json'); // OAuth2クライアントのJSONファイルを読み込む
 const cacheManager = require('../utils/cacheManager');
 const {
   INPUT_RESULT_COMPLETE,
   INPUT_RESULT_FORM_NOT_FOUND,
   INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG, RESULT_SUCCESS, RESULT_ERROR,
 } = require('../utils/result');
+const {gsapi} = require("./google");
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
-
-const jwtClient = new google.auth.JWT(
-    keys.client_email,
-    null,
-    keys.private_key,
-    ['https://www.googleapis.com/auth/spreadsheets'],
-);
-const gsapi = google.sheets({version: 'v4', auth: jwtClient});
 
 // スプレッドシートからデータを取得する関数
 async function fetchSpreadsheetData(range) {
