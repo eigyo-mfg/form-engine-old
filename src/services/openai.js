@@ -63,7 +63,7 @@ ${formattedFormHTML}
 
 Analyze the following form fields and inquiries data. Create a mapping between the form fields 'name' attribute and the corresponding keys in the inquiries data. Only one result must be added as a "value" field in the form field data. 
 Please note, the "value" field should contain the key from the inquiries data that corresponds to the form field, not the actual value from the inquiries data.
-If the field "tag" is 'select' or the field "type" is 'checkbox' or 'radio', you must choose one of the best options from the "values", not the key mappings. If there is an option that means "other," it is most likely the best choice.
+If the field "tag" is 'select' or the field "type" is 'checkbox' or 'radio', you must choose one of the best options from the "values", not the key mappings. The single value to be selected is limited to the value of "values". If there is an option that means "other," it is most likely the best choice.
 Remove the 'html' fields from the output and present the results in JSON format.
 The fields entries must not be deleted.
 
