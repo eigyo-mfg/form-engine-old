@@ -10,7 +10,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "eslint .",
     "lintfix": "eslint . --fix",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "clean:screenshots": "find ./screenshots -type f ! -name '.gitkeep' -delete"
   },
   "author": "",
   "license": "ISC",
@@ -23,6 +24,7 @@
     "fs": "^0.0.1-security",
     "googleapis": "^126.0.1",
     "openai": "^4.12.1",
+    "path": "^0.12.7",
     "puppeteer": "^21.3.7"
   },
   "devDependencies": {

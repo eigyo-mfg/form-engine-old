@@ -56,3 +56,7 @@ $ npm run format
 - 問い合わせ送信処理を行わない
 - 状態判定処理を行わず、完了にする
 - 過去に実行したChatGPTへのリクエストと同じプロンプトの場合、ChatGPTへのリクエストを送らず、Firestoreから過去の結果を取得する
+
+# Google API
+- Sheet APIとDrive APIの有効化が必要
+- serviceAccountKey.jsonを配置する必要がある

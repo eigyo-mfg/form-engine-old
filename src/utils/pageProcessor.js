@@ -7,7 +7,7 @@ const {
   INPUT_RESULT_NONE,
   RESULT_SUCCESS,
   RESULT_ERROR, CONFIRM_RESULT_ERROR, CONFIRM_RESULT_NONE, CONFIRM_RESULT_SUCCESS, INPUT_RESULT_EXIST_RECAPTCHA,
-  CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG,
+  CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG, INPUT_RESULT_FILL_FORM_ERROR, INPUT_RESULT_GET_FIELDS_ERROR,
 } = require('./result');
 const {
   formatAndLogFormData, getFieldsAndSubmit, removeAttributes,
@@ -28,6 +28,7 @@ const {
 const {generateFormsDocumentId} = require('../services/firestore');
 const {isContactForm7, submitContactForm7} = require('./contactForm7');
 const {existRecaptcha} = require('./recaptcha');
+const {uploadImage, getImageUrl} = require("../services/drive");
 const MAX_INPUT_TRIALS = 2;
 
 /**
@@ -69,6 +70,8 @@ class PageProcessor {
     this.confirmResult = CONFIRM_RESULT_NONE;
     this.formMapping = null;
     this.mappingPrompt = '';
+    this.lastScreenshotPath = '';
+    this.screenshotUrl = '';
   }
 
   /**
@@ -96,7 +99,7 @@ class PageProcessor {
             throw new Error(`Unknown state: ${this.state}`);
         }
         // スクリーンショットを撮る
-        await takeScreenshot(this.page, processState + '-end');
+        this.lastScreenshotPath = await takeScreenshot(this.page, processState + '-end');
         // 状態判定
         this.state = await currentState(this.page, this.fields, this.lastStateUrl, this.inputResult, this.confirmResult, this.formId);
         if (this.state === processState) {
@@ -108,6 +111,10 @@ class PageProcessor {
         this.state = STATE_ERROR;
       }
     }
+    // スクリーンショットをアップロード TODO 確認する
+    // const data = await uploadImage(this.lastScreenshotPath);
+    // const fileId = data.id;
+    // this.screenshotUrl = await getImageUrl(fileId);
   }
 
   /**
@@ -135,16 +142,21 @@ class PageProcessor {
     await handleAgreement(this.page);
     // フォームのHTMLを返す
     const {html: formHTML, iframe} = await getLongestElementHtmlAndIframeInfo(this.page, 'form');
-    if (formHTML === undefined || formHTML.length === 0) {
+    if (!formHTML || formHTML.length === 0) {
       console.log('No form found in the HTML. Exiting processOnInput...');
       this.inputResult = INPUT_RESULT_FORM_NOT_FOUND;
       return;
     }
     // const {fields, submit} = analyzeFields(longestFormHTML);
-    const {fields, submit} = getFieldsAndSubmit(formHTML);
-    this.fields = fields;
-    this.submit = submit;
-    console.log('Fields:', fields, 'Submit:', submit);
+    try {
+      const {fields, submit} = getFieldsAndSubmit(formHTML);
+      this.fields = fields;
+      this.submit = submit;
+      console.log('Fields:', fields, 'Submit:', submit);
+    } catch (e) {
+      console.error(e);
+      this.inputResult = INPUT_RESULT_GET_FIELDS_ERROR;
+    }
 
     const formattedFormHTML = removeAttributes(formHTML);
     console.log('Formatted form HTML:', formattedFormHTML);
@@ -154,7 +166,7 @@ class PageProcessor {
     this.inputData = inputData;
 
     // 入力データとフォームのマッピング用プロンプトを作成
-    const mappingPrompt = createMappingPrompt(fields, inputData, formattedFormHTML);
+    const mappingPrompt = createMappingPrompt(this.fields, inputData, formattedFormHTML);
     this.mappingPrompt = mappingPrompt;
 
     // ChatGPTによるマッピング結果取得
@@ -164,7 +176,13 @@ class PageProcessor {
     // フォーム入力用データをフォーマット
     formatAndLogFormData(formMappingGPTResult, inputData);
     // フォームに入力
-    await fillFormFields(this.page, formMappingGPTResult, inputData, iframe);
+    try {
+      await fillFormFields(this.page, formMappingGPTResult, inputData, iframe);
+    } catch (e) {
+      console.error('Error while filling form fields:', e)
+      this.inputResult = INPUT_RESULT_FILL_FORM_ERROR;
+      return
+    }
     // フォームを送信
     await submitForm(this.page, this.submit, iframe)
         .then((result) => {
@@ -304,6 +322,7 @@ class PageProcessor {
    *  fields: null,
    *  formMapping: null
    *  mappingPrompt: string,
+   *  screenshotUrl: string,
    * }}
    */
   getResults() {
@@ -320,6 +339,7 @@ class PageProcessor {
       mappingPrompt: this.mappingPrompt,
       fields: this.fields,
       submit: this.submit,
+      screenshotUrl: this.screenshotUrl,
     };
   }
 }

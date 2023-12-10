@@ -56,6 +56,7 @@ async function run(browser, ssData) {
         results.inputResult,
         results.confirmResult,
         results.mappingPrompt,
+        results.screenshotUrl,
         results.state,
         results.result,
     );
@@ -66,6 +67,7 @@ async function run(browser, ssData) {
         ssData,
         null,
         null,
+        '',
         '',
         '',
         '',
@@ -89,6 +91,7 @@ async function run(browser, ssData) {
  * @param {string} inputResult
  * @param {string} confirmResult
  * @param {string} mappingPrompt
+ * @param {string} screenshotUrl
  * @param {string} state
  * @param {string} result
  * @param {string} errorMessage
@@ -103,6 +106,7 @@ async function saveResult(
     inputResult,
     confirmResult,
     mappingPrompt,
+    screenshotUrl,
     state,
     result,
     errorMessage = '',
@@ -122,10 +126,11 @@ async function saveResult(
     prompt: mappingPrompt,
     result: result,
     state: state,
+    screenshotUrl: screenshotUrl,
     submittedAt: TimeManager.getInstance().getISOString(),
   };
   await saveResultToFirestore(url, formData, submissionData);
-  await saveResultToSpreadsheet(url, inputResult, result, ssData);
+  await saveResultToSpreadsheet(url, inputResult, result, ssData, screenshotUrl);
 }
 
 main().catch(console.error);
