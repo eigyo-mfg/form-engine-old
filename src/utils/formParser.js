@@ -219,8 +219,8 @@ function getSubmitInfo(el) {
 function getSelectValues(el) {
   // 空の選択肢や、テキストに「選択」という文字列が含まれてるoptionは除外する
   return el.find('option')
-      .filter(this.children[0].data && !this.children[0].data.includes('選択'))
-      .map(this.attribs.value)
+      .filter((_, e) => e.children && e.children[0] && e.children[0].data && !e.children[0].data.includes('選択'))
+      .map((_, e) => e.attribs.value)
       .get();
 }
 

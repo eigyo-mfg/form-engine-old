@@ -83,7 +83,7 @@ async function handleAgreement(page) {
         '//span[contains(text(), \'同意\')]',
     );
   } catch (error) {
-    console.error('No agreement button found');
+    console.warn('No agreement button found');
   }
 }
 
@@ -170,8 +170,10 @@ async function setField(page, selector, tag, name, type, value, iframe) {
   const target = iframe.isIn ? iframe.frame : page;
   if (tag === 'input') {
     if (type === 'radio') {
-      console.log(`${tag}[name="${name}"][value="${value}"]`, 'click');
-      await target.click(`${tag}[name="${name}"][value="${value}"]`); // ラジオボタンを選択
+      // valueがonは、ブラウザデフォルトの値で、valueがHTMLに設定されていない可能性が高いので、valueを指定しない
+      const radioSelector = value === 'on' ?　`${tag}[name="${name}"]` : `${tag}[name="${name}"][value="${value}"]`;
+      console.log(radioSelector, 'click');
+      await target.click(radioSelector); // ラジオボタンを選択
     } else if (type === 'checkbox') {
       // 一旦全てのチェックボックスのチェックを外す
       const checkboxes = await target.$$(selector);
@@ -182,11 +184,12 @@ async function setField(page, selector, tag, name, type, value, iframe) {
           await checkbox.click();
         }
       }
-      console.log(`${tag}[name="${name}"][value="${value}"]`, 'click');
-      await waitForSelector(target, `${tag}[name="${name}"][value="${value}"]`);
+      const checkboxSelector = value === 'on' ? `${tag}[name="${name}"]` : `${tag}[name="${name}"][value="${value}"]`;
+      console.log(checkboxSelector, 'click');
+      await waitForSelector(target, checkboxSelector);
       // 全てのチェックボックスが外れた後、対象のチェックボックスをクリック
-      await target.click(`${tag}[name="${name}"][value="${value}"]`);
-      console.log(`${tag}[name="${name}"][value="${value}"]`, 'clicked');
+      await target.click(checkboxSelector);
+      console.log(checkboxSelector, 'clicked');
     } else {
       // 現在の値を取得
       const currentValue = await target.$eval(selector, (el) => el.value);
