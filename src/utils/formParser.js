@@ -120,16 +120,21 @@ function getFieldsAndSubmit(formHtml) {
   const $ = cheerio.load(formHtml);
   console.log('loaded formHtml');
   let fields = [];
-  $('input:not([type="hidden"]):not([type="submit"]), textarea, select').each((_, el) => {
-    const field = getFieldInfo($(el));
-    fields.push(field);
-  });
-  fields = mergeFields(fields);
+  try {
+    $('input:not([type="hidden"]):not([type="submit"]), textarea, select').each((_, el) => {
+      const field = getFieldInfo($(el));
+      fields.push(field);
+    });
+    fields = mergeFields(fields);
 
-  const submitEl = getSubmitElement(formHtml);
-  const submit = getSubmitInfo(submitEl);
-
-  return {fields, submit};
+    const submitEl = getSubmitElement(formHtml);
+    const submit = getSubmitInfo(submitEl);
+    return {fields, submit};
+  } catch (e) {
+    console.error('Error while getting fields and submit', e);
+    console.error('fields:', fields);
+    return {fields: [], submit: {}};
+  }
 }
 
 /**
@@ -141,7 +146,7 @@ function getFieldInfo(el) {
   const field = {};
   const name = el.attr('name');
   // const html = el.prop('outerHTML');
-  const tag = el.prop('tagName').toLowerCase();
+  const tag = el.prop('tagName')?.toLowerCase();
   const type = el.attr('type');
 
   if (name) field.name = name;
@@ -203,7 +208,7 @@ function getSubmitElement(formHtml) {
 
 function getSubmitInfo(el) {
   const submit = {};
-  const tag = el.prop('tagName').toLowerCase();
+  const tag = el.prop('tagName')?.toLowerCase();
   const type = el.attr('type');
 
   if (tag) submit.tag = tag;
