@@ -8,6 +8,7 @@ const {
   RESULT_SUCCESS,
   RESULT_ERROR, CONFIRM_RESULT_ERROR, CONFIRM_RESULT_NONE, CONFIRM_RESULT_SUCCESS, INPUT_RESULT_EXIST_RECAPTCHA,
   CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG, INPUT_RESULT_FILL_FORM_ERROR, INPUT_RESULT_GET_FIELDS_ERROR,
+  INPUT_RESULT_MAPPING_ERROR,
 } = require('./result');
 const {
   formatAndLogFormData, getFieldsAndSubmit, removeAttributes,
@@ -111,10 +112,10 @@ class PageProcessor {
         this.state = STATE_ERROR;
       }
     }
-    // スクリーンショットをアップロード TODO 確認する
-    // const data = await uploadImage(this.lastScreenshotPath);
-    // const fileId = data.id;
-    // this.screenshotUrl = await getImageUrl(fileId);
+    // スクリーンショットをアップロード
+    const data = await uploadImage(this.lastScreenshotPath);
+    const fileId = data.id;
+    this.screenshotUrl = await getImageUrl(fileId);
   }
 
   /**
@@ -170,14 +171,20 @@ class PageProcessor {
     this.mappingPrompt = mappingPrompt;
 
     // ChatGPTによるマッピング結果取得
-    const formMappingGPTResult = await requestAndAnalyzeMapping(mappingPrompt, this.formId);
-    this.formMapping = formMappingGPTResult;
+    try {
+      const formMappingGPTResult = await requestAndAnalyzeMapping(mappingPrompt, this.formId);
+      this.formMapping = formMappingGPTResult;
+    } catch (e) {
+      console.error('Error while requesting mapping:', e);
+      this.inputResult = INPUT_RESULT_MAPPING_ERROR;
+      return;
+    }
 
     // フォーム入力用データをフォーマット
-    formatAndLogFormData(formMappingGPTResult, inputData);
+    formatAndLogFormData(this.formMapping, inputData);
     // フォームに入力
     try {
-      await fillFormFields(this.page, formMappingGPTResult, inputData, iframe);
+      await fillFormFields(this.page, this.formMapping, inputData, iframe);
     } catch (e) {
       console.error('Error while filling form fields:', e)
       this.inputResult = INPUT_RESULT_FILL_FORM_ERROR;
