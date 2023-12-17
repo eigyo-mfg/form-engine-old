@@ -208,7 +208,8 @@ function getSubmitElement(formHtml) {
     return submitEl;
   }
   console.warn('No submit button found. Trying to find submit link...');
-  const submitTexts = ['送信', '確認', '申込', '次へ', '進む'];
+  // const submitTexts = ['送信', '確認', '申込', '次へ', '進む'];
+  const submitTexts = ['送', '確', '申', '次', '進'];
   // 全てのaタグのテキストを検証して、対象があれば送信ボタンとして扱う
   $('a').each((_, el) => {
     const text = $(el).text();

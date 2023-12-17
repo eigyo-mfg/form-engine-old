@@ -113,12 +113,12 @@ function getSymbol(inputResult, result) {
           return 'Unknown';
       }
     case INPUT_RESULT_ERROR:
-    case INPUT_RESULT_EXIST_RECAPTCHA:
     case INPUT_RESULT_MAPPING_ERROR:
     case INPUT_RESULT_GET_FIELDS_ERROR:
     case INPUT_RESULT_FILL_FORM_ERROR:
       return '×';
     case INPUT_RESULT_FORM_NOT_FOUND:
+    case INPUT_RESULT_EXIST_RECAPTCHA:
     case INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG:
       return '-';
     default:

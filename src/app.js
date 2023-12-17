@@ -13,6 +13,7 @@ const {
 async function main() {
   // TimeManagerインスタンスを生成
   TimeManager.getInstance();
+  console.log("start time", TimeManager.getInstance().getFormattedDate())
 
   // スプレッドシートからデータを取得
   const ssDataList = await getUrls();
