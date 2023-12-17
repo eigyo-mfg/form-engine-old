@@ -16,7 +16,7 @@ async function fillFormFields(page, formData, inputData, iframe) {
   for (const field of formData.fields) {
     if (!field.name) {
       console.warn('No name found for field:', field);
-      continue;
+      // continue;
     }
     if (!field.value && field.value !== '') {
       console.warn('No value found for field:', field);
@@ -81,8 +81,12 @@ async function handleFieldInput(page, field, sendValue, iframe) {
 function getSelector(field, attr = 'name', includeFormTag = false) {
   const tag = field.tag;
   const value = field[attr];
-  if (!tag || !value) {
+  if (!tag) {
     return null;
+  }
+  if (!value) {
+    // valueが空の場合は、indexを元にセレクタを生成
+    return `${includeFormTag ? 'form ' : ''}${tag}:eq(${field.index})`;
   }
   return `${includeFormTag ? 'form ' : ''}${tag}[${attr}="${value}"]`;
 }

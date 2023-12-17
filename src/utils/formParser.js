@@ -121,9 +121,17 @@ function getFieldsAndSubmit(formHtml) {
   console.log('loaded formHtml');
   let fields = [];
   try {
-    $('input:not([type="hidden"]):not([type="submit"]), textarea, select').each((_, el) => {
-      const field = getFieldInfo($(el));
-      fields.push(field);
+    const selectors = [
+      'input:not([type="hidden"]):not([type="submit"])',
+      'textarea',
+      'select'
+    ];
+
+    selectors.forEach(selector => {
+      $(selector).each((index, el) => {
+        const field = getFieldInfo($(el), index);
+        fields.push(field);
+      });
     });
     fields = mergeFields(fields);
 
@@ -140,16 +148,21 @@ function getFieldsAndSubmit(formHtml) {
 /**
  * フィールドの情報を取得する
  * @param {Element} el
+ * @param {number} index
  * @return {{name}}
  */
-function getFieldInfo(el) {
+function getFieldInfo(el, index) {
   const field = {};
   const name = el.attr('name');
   // const html = el.prop('outerHTML');
   const tag = el.prop('tagName')?.toLowerCase();
   const type = el.attr('type');
 
-  if (name) field.name = name;
+  if (name) {
+    field.name = name;
+  } else {
+    field.index = index;
+  }
   // if (html) field.html = html;
   if (tag) field.tag = tag;
   if (type) field.type = type;
