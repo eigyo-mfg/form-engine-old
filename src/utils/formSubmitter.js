@@ -22,6 +22,10 @@ async function fillFormFields(page, formData, inputData, iframe) {
       console.warn('No value found for field:', field);
       continue;
     }
+    if (field.value === 'nothing_else') {
+      console.log('Skip field value for nothing_else:', field);
+      continue;
+    }
     const sendValue = (
         (field.type === 'radio' ||
         field.type === 'checkbox' ||
@@ -95,7 +99,6 @@ async function submitForm(page, submit, iframe) {
   // スクリーンショットを撮る
   await takeScreenshot(page, 'input-before-submit');
   // viewportを元に戻す
-  await page.setViewport({width: 800, height: 600});
   await new Promise((r) => setTimeout(r, 1000));
 
   const target = iframe.isIn ? iframe.frame : page;
@@ -104,10 +107,10 @@ async function submitForm(page, submit, iframe) {
   try {
     const submitSelector = getSelector(submit, 'type', true);
     console.log('submitSelector', submitSelector);
-    // await waitForSelector(target, submitSelector).catch((e) => {
-    //   console.error(e);
-    //   return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND
-    // });
+    if (!submitSelector) {
+      console.warn('No submit selector found:', submit);
+      return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND;
+    }
     // デバッグの場合は送信処理をスキップ
     if (process.env.DEBUG === 'true') {
       console.log('Not submit for debug');

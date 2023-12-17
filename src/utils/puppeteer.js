@@ -60,7 +60,13 @@ async function clickElement(page, xpath, timeout = 3000) {
   const [element] = await page.$x(xpath);
   if (element) {
     await element.click();
-    if (timeout > 0) await page.waitForNavigation({timeout: timeout});
+    if (timeout > 0) {
+      try {
+        await page.waitForNavigation({timeout: timeout});
+      } catch (e) {
+        console.warn('Navigation timeout');
+      }
+    }
   }
 }
 
@@ -94,12 +100,6 @@ async function handleAgreement(page) {
  * @return {Promise<string>}
  */
 async function takeScreenshot(page, stage = '') {
-  const bodyHandle = await page.$('body');
-  const {width, height} = await bodyHandle.boundingBox();
-  await bodyHandle.dispose();
-
-  await page.setViewport({width: Math.ceil(width), height: Math.ceil(height)});
-
   const domainName = new URL(page.url()).hostname;
   const tm = TimeManager.getInstance();
   const dateTime = tm.getFormattedISOString();
@@ -109,7 +109,16 @@ async function takeScreenshot(page, stage = '') {
   }
   const screenshotPath = `${ssDir}/${domainName}_${dateTime}_${stage}.png`;
 
-  await page.screenshot({path: screenshotPath, fullPage: true});
+  try {
+    await page.screenshot({path: screenshotPath, fullPage: true});
+  } catch (error) {
+    console.warn(`Failed to take a full page screenshot due to ${error}`);
+    try {
+      await page.screenshot({path: screenshotPath}); // fullPage option is not specified
+    } catch (error) {
+      console.error(`Failed to take a screenshot due to ${error}`);
+    }
+  }
 
   return screenshotPath;
 }
@@ -170,25 +179,27 @@ async function setField(page, selector, tag, name, type, value, iframe) {
   const target = iframe.isIn ? iframe.frame : page;
   if (tag === 'input') {
     if (type === 'radio') {
+      if (value === '') return // valueが空の場合はスキップ
       // valueがonは、ブラウザデフォルトの値で、valueがHTMLに設定されていない可能性が高いので、valueを指定しない
       const radioSelector = value === 'on' ?　`${tag}[name="${name}"]` : `${tag}[name="${name}"][value="${value}"]`;
       console.log(radioSelector, 'click');
-      await target.click(radioSelector); // ラジオボタンを選択
+      // ラジオボタンを選択
+      await clickIf(target, radioSelector);
     } else if (type === 'checkbox') {
+      if (value === '') return // valueが空の場合はスキップ
       // 一旦全てのチェックボックスのチェックを外す
       const checkboxes = await target.$$(selector);
       for (const checkbox of checkboxes) {
         const isChecked = await target.evaluate((el) => el.checked, checkbox);
         // チェックされてたらクリック
         if (isChecked) {
-          await checkbox.click();
+          await clickIf(target, checkbox)
         }
       }
       const checkboxSelector = value === 'on' ? `${tag}[name="${name}"]` : `${tag}[name="${name}"][value="${value}"]`;
       console.log(checkboxSelector, 'click');
-      await waitForSelector(target, checkboxSelector);
       // 全てのチェックボックスが外れた後、対象のチェックボックスをクリック
-      await target.click(checkboxSelector);
+      await clickIf(target, checkboxSelector);
       console.log(checkboxSelector, 'clicked');
     } else {
       // 現在の値を取得
@@ -201,15 +212,22 @@ async function setField(page, selector, tag, name, type, value, iframe) {
         // 現在の値をクリア
         await target.$eval(selector, (el) => (el.value = ''));
       }
-      await target.type(selector, value); // 値を入力
+      // 値を入力
+      await typeIf(target, selector, value);
     }
   } else if (tag === 'textarea') {
+    try {
+      await waitForSelector(target, selector);
+    } catch (e) {
+      console.warn('Textarea selector not found', selector);
+      return;
+    }
     await target.focus(selector); // テキストエリアにフォーカスを当てる
     await target.$eval(selector, (el) => (el.value = '')); // 現在の値をクリア
     await target.type(selector, value); // 新しい値を入力
   } else if (tag === 'select') {
     // セレクトボックスを選択
-    await target.select(selector, value);
+    await selectIf(target, selector, value);
   }
 }
 
@@ -223,6 +241,48 @@ async function waitForNavigation(page, timeout = 5000) {
 
 async function waitForTimeout(page, timeout = 5000) {
   await page.waitForTimeout(timeout);
+}
+
+async function clickIf(page, selector) {
+  try {
+    await waitForSelector(page, selector);
+  } catch (e) {
+    console.warn('Click selector not found', selector);
+    return
+  }
+  try {
+    await page.click(selector);
+  } catch (e) {
+    console.warn('Click failed', selector);
+  }
+}
+
+async function typeIf(page, selector, value) {
+  try {
+    await waitForSelector(page, selector);
+  } catch (e) {
+    console.warn('Type selector not found', selector);
+    return
+  }
+  try {
+    await page.type(selector, value);
+  } catch (e) {
+    console.warn('Type failed', selector);
+  }
+}
+
+async function selectIf(page, selector, value) {
+  try {
+    await waitForSelector(page, selector);
+  } catch (e) {
+    console.warn('Select selector not found', selector);
+    return
+  }
+  try {
+    await page.select(selector, value);
+  } catch (e) {
+    console.warn('Select failed', selector);
+  }
 }
 
 module.exports = {
