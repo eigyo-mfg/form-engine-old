@@ -1,4 +1,4 @@
-const {takeScreenshot, setField, waitForSelector, waitForTimeout} = require('./puppeteer');
+const {takeScreenshot, setField, waitForSelector, waitForTimeout, setFieldByIndex} = require('./puppeteer');
 const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG,
   INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND, INPUT_RESULT_FORM_INPUT_FORMAT_INVALID,
 } = require('./result');
@@ -51,6 +51,11 @@ async function fillFormFields(page, formData, inputData, iframe) {
  * @return {Promise<void>}
  */
 async function handleFieldInput(page, field, sendValue, iframe) {
+  if (field.index !== undefined) {
+    console.log('handleFieldInputByIndex', field)
+    await setFieldByIndex(page, field, sendValue, iframe);
+    return;
+  }
   const selector = getSelector(field); // セレクタを取得
   console.log(
       'Handling field:', field.name,
@@ -81,12 +86,8 @@ async function handleFieldInput(page, field, sendValue, iframe) {
 function getSelector(field, attr = 'name', includeFormTag = false) {
   const tag = field.tag;
   const value = field[attr];
-  if (!tag) {
+  if (!tag || !value) {
     return null;
-  }
-  if (!value) {
-    // valueが空の場合は、indexを元にセレクタを生成
-    return `${includeFormTag ? 'form ' : ''}${tag}:eq(${field.index})`;
   }
   return `${includeFormTag ? 'form ' : ''}${tag}[${attr}="${value}"]`;
 }

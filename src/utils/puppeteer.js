@@ -231,6 +231,30 @@ async function setField(page, selector, tag, name, type, value, iframe) {
   }
 }
 
+async function setFieldByIndex(page, field, value, iframe) {
+  const target = iframe.isIn ? iframe.frame : page;
+  const elements = await target.$$(`form ${field.tag}`);
+  const element = elements[field.index];
+  if (!element) {
+    console.warn('Element not found', field);
+    return;
+  }
+  try {
+    if (field.type === 'radio' || field.type === 'checkbox') {
+      await element.click();
+    } else if (field.tag === 'select') {
+      await element.select();
+    } else if (field.tag === 'input' || field.tag === 'textarea') {
+      // await element.type(value);
+      await target.evaluate((el, value) => el.value = value, element, value);
+    } else {
+      console.warn('Unsupported tag', field);
+    }
+  } catch (e) {
+    console.warn('Set field by index failed', field);
+  }
+}
+
 async function waitForSelector(page, selector, timeout = 5000) {
   await page.waitForSelector(selector, {timeout: timeout});
 }
@@ -293,6 +317,7 @@ module.exports = {
   takeScreenshot,
   getLongestElementHtmlAndIframeInfo,
   setField,
+  setFieldByIndex,
   waitForSelector,
   waitForNavigation,
   waitForTimeout,
