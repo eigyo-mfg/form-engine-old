@@ -203,6 +203,31 @@ function getSubmitElement(formHtml) {
       submitEl = $(el);
     }
   });
+  if (submitEl.length > 0) {
+    return submitEl;
+  }
+  // 全てのinputボタンのテキストを検証して、対象があれば送信ボタンとして扱う
+  $('input[type="button"], button[type="button"]').each((_, el) => {
+      const text = $(el).val();
+      if (text && submitTexts.some((submitText) => text.includes(submitText))) {
+        submitEl = $(el);
+      }
+  });
+  if (submitEl.length > 0) {
+    return submitEl;
+  }
+  // 子要素の検証、対象があれば親要素を送信ボタンとして扱う
+  $('button > span').each((_, el) => {
+    if (!el.children || el.children.length === 0) return;
+    const childData = el.children[0].data;
+    if (childData && submitTexts.some((submitText) => childData.includes(submitText))) {
+      submitEl = $(el.parent);
+    }
+  });
+  if (submitEl.length > 0) {
+    return submitEl;
+  }
+  console.warn('Tried to find submit element for all possible cases but failed. Returning empty element.')
   return submitEl;
 }
 
@@ -251,7 +276,7 @@ function removeAttributes(html) {
   });
 
   // optionタグが一定以上の数の場合、削除する
-  if ($('option').length > 10) {
+  if ($('option').length > 500) {
     $('option').remove();
   }
   // scriptタグは不要のため削除する
