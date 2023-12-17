@@ -63,7 +63,7 @@ ${formattedFormHTML}
 
 Analyze the following form fields and inquiries data. Create a mapping between the form fields 'name' attribute and the corresponding keys in the inquiries data. Only one result must be added as a "value" field in the form field data. 
 Please note, the "value" field should contain the key from the inquiries data that corresponds to the form field, not the actual value from the inquiries data.
-If the field "tag" is 'select' or the field "type" is 'checkbox' or 'radio', you must choose one of the best options from the "values", not the key mappings. The value must always be selected from "values". If there is an option that means "other," it is most likely the best choice.
+If the field "tag" is "select" or the field "type" is "checkbox" or "radio", The "value" must choose one of the best options from the "values" field, not the key mappings. The value must always be selected from "values" field. If there is an option that means "other," it is most likely the best choice.
 Remove the 'html' fields from the output and present the results in JSON format.
 The fields entries must not be deleted.
 
@@ -71,6 +71,7 @@ Observe the following points when creating the mapping:
 - Addresses may be distributed across multiple fields. Also, no part of the address, including the "select" tag field, may overlap with another field. And if there is a "select" tag field for the address, one must be selected. If none of the address options apply, map to the most appropriate key. If the "select" field after selecting a prefecture has a choice containing "区", then "address_city_ward" is mapped. The address field at the end always includes the name of the building. For example, if there is a "select" field for the prefecture, the next input field should not contain the prefecture. 
 - Name input may be separated into first and last.
 - In the field related to furigana, if furigana is written in katakana such as "フリガナ", map katakana; if in hiragana such as "ふりがな", map hiragana, and never mapping kanji.
+- Zip codes and phone numbers must always be checked to see if hyphens are required from the placeholder or label information, and if not, the non-hyphenated keys must be mapped.
 - Mapping the characters displayed in the html, not the "name" of the field, as important. Similarly, data used for inquiries should be mapped based on value, not only key name.
 - The html often shows example inputs, so be sure to refer to them for mapping.
 - With the exception of email addresses, the same data should not be mapped to more than one field. However, if mapping is not possible, nothing_else should be mapped.
