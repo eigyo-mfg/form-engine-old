@@ -110,8 +110,13 @@ async function submitForm(page, submit, iframe) {
   console.log("target is ", iframe.isIn ? "iframe" : "page");
 
   try {
-    const submitSelector = getSelector(submit, 'type', true);
+    const submitSelector = getSelector(submit, submit.class ? 'class' : 'type', true);
     console.log('submitSelector', submitSelector);
+    try {
+      await waitForSelector(target, submitSelector);
+    } catch (e) {
+      console.warn('No submit selector found:', submit);
+    }
     if (!submitSelector) {
       console.warn('No submit selector found:', submit);
       return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND;
