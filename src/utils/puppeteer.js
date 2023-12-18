@@ -193,7 +193,7 @@ async function setField(page, selector, tag, name, type, value, iframe) {
         const isChecked = await target.evaluate((el) => el.checked, checkbox);
         // チェックされてたらクリック
         if (isChecked) {
-          await clickIf(target, checkbox)
+          await checkbox.click();
         }
       }
       const checkboxSelector = value === 'on' ? `${tag}[name="${name}"]` : `${tag}[name="${name}"][value="${value}"]`;
@@ -241,12 +241,21 @@ async function setFieldByIndex(page, field, value, iframe) {
   }
   try {
     if (field.type === 'radio' || field.type === 'checkbox') {
-      await element.click();
+      try {
+        await element.click();
+      } catch (e) {
+        console.log('click failed, try to set value')
+        await target.evaluate((el) => el.checked = true, element);
+      }
     } else if (field.tag === 'select') {
       await element.select();
     } else if (field.tag === 'input' || field.tag === 'textarea') {
-      // await element.type(value);
-      await target.evaluate((el, value) => el.value = value, element, value);
+      try {
+        await element.type(value);
+      } catch (e) {
+        console.log("type failed, try to set value")
+        await target.evaluate((el, value) => el.value = value, element, value);
+      }
     } else {
       console.warn('Unsupported tag', field);
     }
@@ -272,7 +281,6 @@ async function clickIf(page, selector) {
     await waitForSelector(page, selector);
   } catch (e) {
     console.warn('Click selector not found', selector);
-    return
   }
   try {
     await page.click(selector);
