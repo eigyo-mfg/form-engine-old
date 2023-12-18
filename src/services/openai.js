@@ -56,8 +56,10 @@ function createMappingPrompt(fields, inputData, formattedFormHTML) {
   const prompt = `
 Analyze the following form fields:
 ${fieldsJson}
+
 The data used for inquiries is below.
 ${inputDataJson}
+
 The html structure of the entire inquiry form is as follows.
 ${formattedFormHTML}
 
@@ -71,7 +73,7 @@ Observe the following points when creating the mapping:
 - Addresses may be distributed across multiple fields. Also, no part of the address, including the "select" tag field, may overlap with another field. And if there is a "select" tag field for the address, one must be selected. If none of the address options apply, map to the most appropriate key. If the "select" field after selecting a prefecture has a choice containing "区", then "address_city_ward" is mapped. The address field at the end always includes the name of the building. For example, if there is a "select" field for the prefecture, the next input field should not contain the prefecture. 
 - Name input may be separated into first and last.
 - In the field related to furigana, if furigana is written in katakana such as "フリガナ", map katakana; if in hiragana such as "ふりがな", map hiragana, and never mapping kanji.
-- Zip codes and phone numbers must always be checked to see if hyphens are required from the placeholder or label information, and if not, the non-hyphenated keys must be mapped.
+- Zip codes and phone numbers must always be checked to see if hyphens are required from the placeholder or label information in the html structure. If the example contains hyphens, you must map the hyphenated keys. If it does not contain hyphens, you must map the non-hyphenated keys.
 - Mapping the characters displayed in the html, not the "name" of the field, as important. Similarly, data used for inquiries should be mapped based on value, not only key name.
 - The html often shows example inputs, so be sure to refer to them for mapping.
 - With the exception of email addresses, the same data should not be mapped to more than one field. However, if mapping is not possible, nothing_else should be mapped.
