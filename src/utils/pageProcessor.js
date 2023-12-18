@@ -108,6 +108,7 @@ class PageProcessor {
         }
         this.lastStateUrl = this.page.url();
       } catch (e) {
+        console.log('Error occurred while processing page. url:', this.lastStateUrl);
         console.error(e);
         this.state = STATE_ERROR;
       }
@@ -228,7 +229,7 @@ class PageProcessor {
 
       await this.page.waitForSelector(
           'input[type="submit"], button[type="submit"]',
-          {timeout: 10000},
+          {timeout: 20000},
       );
 
       const currentURL = this.page.url();
@@ -276,7 +277,7 @@ class PageProcessor {
           }
 
           // 完了メッセージの表示やページ遷移を待つために少し待つ
-          await waitForTimeout(this.page, 5000);
+          await waitForTimeout(this.page, 10000);
           await takeScreenshot(this.page, 'confirm-clicked');
           this.confirmResult = CONFIRM_RESULT_SUCCESS;
           break;

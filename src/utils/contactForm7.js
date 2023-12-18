@@ -16,7 +16,7 @@ async function submitContactForm7(page) {
     elements[0].click();
   });
   // 送信完了まで待機
-  await waitForTimeout(page, 5000);
+  await waitForTimeout(page, 10000);
 }
 
 async function isSucceedSendContactForm7(page) {

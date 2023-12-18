@@ -25,7 +25,7 @@ async function extractFormHTML(page) {
     for (const iframe of iframes) {
       try {
         const frame = await iframe.contentFrame();
-        await frame.waitForSelector('form', {timeout: 5000});
+        await frame.waitForSelector('form', {timeout: 10000});
 
         const iframeHTML = await frame.content();
         const $iframe = cheerio.load(iframeHTML);

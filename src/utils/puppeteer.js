@@ -46,7 +46,7 @@ async function newPage(browser) {
  */
 async function goto(page, url) {
   console.log('goto:', url);
-  await page.goto(url, {waitUntil: 'networkidle2', timeout: 10000});
+  await page.goto(url, {waitUntil: 'networkidle2', timeout: 20000});
 }
 
 /**
@@ -56,7 +56,7 @@ async function goto(page, url) {
  * @param {number} timeout
  * @return {Promise<void>}
  */
-async function clickElement(page, xpath, timeout = 3000) {
+async function clickElement(page, xpath, timeout = 6000) {
   const [element] = await page.$x(xpath);
   if (element) {
     await element.click();
@@ -264,15 +264,15 @@ async function setFieldByIndex(page, field, value, iframe) {
   }
 }
 
-async function waitForSelector(page, selector, timeout = 5000) {
+async function waitForSelector(page, selector, timeout = 10000) {
   await page.waitForSelector(selector, {timeout: timeout});
 }
 
-async function waitForNavigation(page, timeout = 5000) {
+async function waitForNavigation(page, timeout = 10000) {
   await page.waitForNavigation({timeout: timeout});
 }
 
-async function waitForTimeout(page, timeout = 5000) {
+async function waitForTimeout(page, timeout = 10000) {
   await page.waitForTimeout(timeout);
 }
 

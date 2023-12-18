@@ -142,8 +142,8 @@ async function submitForm(page, submit, iframe) {
     const result = await Promise.race([
       target.waitForFunction(() => window.__mutationSuccess === true).then(() => mutationSuccess),
       target.waitForFunction(() => window.__mutationFailed === true).then(() => mutationFailed),
-      target.waitForNavigation({timeout: 10000}).then(() => 'navigation'),
-      waitForTimeout(target, 5000).then(() => 'timeout'),
+      target.waitForNavigation({timeout: 20000}).then(() => 'navigation'),
+      waitForTimeout(target, 10000).then(() => 'timeout'),
     ]);
     if (result === mutationFailed) {
       console.warn('入力エラーを検知');
