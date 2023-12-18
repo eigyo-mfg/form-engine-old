@@ -272,7 +272,14 @@ function getSubmitInfo(el) {
   const type = el.attr('type');
 
   if (tag) submit.tag = tag;
-  if (type) submit.type = type;
+  if (type) {
+    submit.type = type;
+  } else {
+    const c = el[0].attribs['class']
+    if (c) {
+      submit.class = c;
+    }
+  }
 
   return submit;
 }
@@ -314,6 +321,15 @@ function removeAttributes(html) {
   if ($('option').length > 500) {
     $('option').remove();
   }
+  // 個人情報・プライバシーに関するpタグは削除する
+  $('p, li').each(function() {
+    const text = $(this).text();
+    console.log('text', text)
+    if (text.includes('個人情報') || text.includes('プライバシー') || text.includes('改訂') || text === '') {
+      $(this).remove();
+    }
+  })
+
   // scriptタグは不要のため削除する
   $('script').remove();
 
