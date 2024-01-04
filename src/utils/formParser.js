@@ -157,7 +157,7 @@ function getFieldInfo(el, index) {
   // const html = el.prop('outerHTML');
   const tag = el.prop('tagName')?.toLowerCase();
   const type = el.attr('type');
-
+  const placeholder = el.attr('placeholder');
   if (name) {
     field.name = name;
   } else {
@@ -166,6 +166,7 @@ function getFieldInfo(el, index) {
   // if (html) field.html = html;
   if (tag) field.tag = tag;
   if (type) field.type = type;
+  if (placeholder) field.placeholder = placeholder;
 
   // selectの場合はvaluesを追加
   if (tag === 'select') {
