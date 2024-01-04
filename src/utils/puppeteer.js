@@ -191,9 +191,10 @@ async function setField(page, selector, tag, name, type, value, iframe) {
       const checkboxes = await target.$$(selector);
       for (const checkbox of checkboxes) {
         const isChecked = await target.evaluate((el) => el.checked, checkbox);
-        // チェックされてたらクリック
+        // チェックされてたらチェックを外す
         if (isChecked) {
-          await checkbox.click();
+          // await checkbox.click();
+          await target.$eval(selector, (el) => el.checked = false);
         }
       }
       const checkboxSelector = value === 'on' ? `${tag}[name="${name}"]` : `${tag}[name="${name}"][value="${value}"]`;
@@ -251,6 +252,7 @@ async function setFieldByIndex(page, field, value, iframe) {
       await element.select();
     } else if (field.tag === 'input' || field.tag === 'textarea') {
       try {
+        await target.$eval(element, (el) => (el.value = '')); // 現在の値をクリア
         await element.type(value);
       } catch (e) {
         console.log("type failed, try to set value")
