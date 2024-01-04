@@ -235,7 +235,7 @@ class PageProcessor {
       const currentURL = this.page.url();
       console.log(`Current URL before clicking: ${currentURL}`);
 
-      const buttons = await this.page.$$('button, input[type="submit"]');
+      const buttons = await this.page.$$('form button, form input[type="submit"]');
       console.log(`Found ${buttons.length} buttons`);
 
       for (const button of buttons) {
