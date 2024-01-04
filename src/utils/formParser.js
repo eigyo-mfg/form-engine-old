@@ -262,6 +262,14 @@ function getSubmitElement(formHtml) {
   if (submitEl.length > 0) {
     return submitEl;
   }
+  // btnクラスを持つdiv要素を検証, 子要素のテキストに対象があれば送信ボタンとして扱う
+  $('.btn').each((_, el) => {
+      const text = $(el).text();
+      console.log({text});
+      if (text && submitTexts.some((submitText) => text.includes(submitText))) {
+      submitEl = $(el);
+      }
+  });
   console.warn('Tried to find submit element for all possible cases but failed. Returning empty element.')
   return submitEl;
 }
