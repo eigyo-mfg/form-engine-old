@@ -8,7 +8,7 @@ const {
   RESULT_SUCCESS,
   RESULT_ERROR, CONFIRM_RESULT_ERROR, CONFIRM_RESULT_NONE, CONFIRM_RESULT_SUCCESS, INPUT_RESULT_EXIST_RECAPTCHA,
   CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG, INPUT_RESULT_FILL_FORM_ERROR, INPUT_RESULT_GET_FIELDS_ERROR,
-  INPUT_RESULT_MAPPING_ERROR, INPUT_RESULT_SUBMIT_BUTTON_NOT_FOUND,
+  INPUT_RESULT_MAPPING_ERROR, INPUT_RESULT_SUBMIT_BUTTON_NOT_FOUND, CONFIRM_SUBMIT_BUTTON_NOT_FOUND,
 } = require('./result');
 const {
   formatAndLogFormData, getFieldsAndSubmit, removeAttributes,
@@ -233,16 +233,22 @@ class PageProcessor {
         return;
       }
 
-      await this.page.waitForSelector(
-          'input[type="submit"], button[type="submit"]',
-          {timeout: 20000},
-      );
-
       const currentURL = this.page.url();
       console.log(`Current URL before clicking: ${currentURL}`);
 
-      const buttons = await this.page.$$('form button, form input[type="submit"]');
+      let buttonsSelector = this.submit.tag === 'a' ? 'form a' : 'form button, form input[type="submit"]'
+      let buttons = await this.page.$$(buttonsSelector);
       console.log(`Found ${buttons.length} buttons`);
+      if (buttons.length === 0) {
+        buttonsSelector = this.submit.tag === 'a' ? 'a' : 'button, input[type="submit"]'
+        buttons = await this.page.$$(buttonsSelector);
+        console.log(`Found ${buttons.length} buttons outside form tag`);
+      }
+      if (buttons.length === 0) {
+        console.log('No buttons found');
+        this.confirmResult = CONFIRM_SUBMIT_BUTTON_NOT_FOUND;
+        return;
+      }
 
       for (const button of buttons) {
         const buttonText = await this.page.evaluate(
