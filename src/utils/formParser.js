@@ -275,7 +275,7 @@ function getSubmitInfo(el) {
   if (type) {
     submit.type = type;
   } else {
-    const c = el[0].attribs['class']
+    const c = el[0]?.attribs['class']
     if (c) {
       submit.class = c;
     }
@@ -330,8 +330,8 @@ function removeAttributes(html) {
     }
   })
 
-  // scriptタグは不要のため削除する
-  $('script').remove();
+  // script, styleタグは不要のため削除する
+  $('script, style').remove();
 
   const cleanedHtml = $.html()
       .replace(/\n\s*\n/g, '\n') // remove empty lines
@@ -341,11 +341,10 @@ function removeAttributes(html) {
 }
 
 /**
- * ヘッダー、フッター、サイドバーの要素を削除する
+ * ヘッダー、フッター、サイドバー、Navバーの要素を削除する
  */
-function removeHeaderFooterSidebar(html) {
-  const $ = cheerio.load(html);
-  $('header, footer, .sidebar').remove();
+function removeHeaderFooterSidebar($) {
+  $('header, footer, .sidebar, nav').remove();
   return $.html();
 }
 
