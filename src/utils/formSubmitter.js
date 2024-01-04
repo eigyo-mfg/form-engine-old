@@ -86,7 +86,17 @@ async function handleFieldInput(page, field, sendValue, iframe) {
 function getSelector(field, attr = 'name', includeFormTag = false) {
   const tag = field.tag;
   const value = field[attr];
-  if (!tag || !value) {
+  if (tag === 'a') {
+    const onclick = field.onclick;
+    if (onclick) {
+      return `${includeFormTag ? 'form ' : ''}${tag}[onclick="${onclick}"]`;
+    }
+    const href = field.href;
+    if (href) {
+      return `${includeFormTag ? 'form ' : ''}${tag}[href="${href}"]`;
+    }
+    return `${includeFormTag ? 'form ' : ''}${tag}`;
+  } else if (!tag || !value) {
     return null;
   }
   return `${includeFormTag ? 'form ' : ''}${tag}[${attr}="${value}"]`;
@@ -115,9 +125,6 @@ async function submitForm(page, submit, iframe) {
     try {
       await waitForSelector(target, submitSelector);
     } catch (e) {
-      console.warn('No submit selector found:', submit);
-    }
-    if (!submitSelector) {
       console.warn('No submit selector found:', submit);
       return INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND;
     }

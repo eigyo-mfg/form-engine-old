@@ -281,6 +281,13 @@ function getSubmitInfo(el) {
   const type = el.attr('type');
 
   if (tag) submit.tag = tag;
+  if (tag === 'a') {
+    const href = el[0]?.attribs['href'];
+    if (href) submit.href = el[0]?.attribs['href'];
+
+    const onclick = el[0]?.attribs['onclick'];
+    if (onclick) submit.onclick = el[0]?.attribs['onclick'];
+  }
   if (type) {
     submit.type = type;
   } else {
