@@ -8,7 +8,7 @@ const {
   RESULT_SUCCESS,
   RESULT_ERROR, CONFIRM_RESULT_ERROR, CONFIRM_RESULT_NONE, CONFIRM_RESULT_SUCCESS, INPUT_RESULT_EXIST_RECAPTCHA,
   CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG, INPUT_RESULT_FILL_FORM_ERROR, INPUT_RESULT_GET_FIELDS_ERROR,
-  INPUT_RESULT_MAPPING_ERROR,
+  INPUT_RESULT_MAPPING_ERROR, INPUT_RESULT_SUBMIT_BUTTON_NOT_FOUND,
 } = require('./result');
 const {
   formatAndLogFormData, getFieldsAndSubmit, removeAttributes,
@@ -158,6 +158,12 @@ class PageProcessor {
     } catch (e) {
       console.error(e);
       this.inputResult = INPUT_RESULT_GET_FIELDS_ERROR;
+      return;
+    }
+    if (!this.submit || Object.keys(this.submit).length === 0) {
+      console.log('No submit button found. Exiting processOnInput...');
+      this.inputResult = INPUT_RESULT_SUBMIT_BUTTON_NOT_FOUND;
+      return;
     }
 
     const formattedFormHTML = removeAttributes(formHTML);
@@ -176,7 +182,7 @@ class PageProcessor {
       const formMappingGPTResult = await requestAndAnalyzeMapping(mappingPrompt, this.formId);
       this.formMapping = formMappingGPTResult;
     } catch (e) {
-      console.error('Error while requesting mapping:', e);
+      console.error('Errorq while requesting mapping:', e);
       this.inputResult = INPUT_RESULT_MAPPING_ERROR;
       return;
     }
