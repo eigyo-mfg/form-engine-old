@@ -198,10 +198,10 @@ async function setField(page, selector, tag, name, type, value, iframe) {
         }
       }
       const checkboxSelector = value === 'on' ? `${tag}[name="${name}"]` : `${tag}[name="${name}"][value="${value}"]`;
-      console.log(checkboxSelector, 'click');
+      console.log(checkboxSelector, 'check');
       // 全てのチェックボックスが外れた後、対象のチェックボックスをクリック
-      await clickIf(target, checkboxSelector);
-      console.log(checkboxSelector, 'clicked');
+      await checkIf(target, checkboxSelector);
+      console.log(checkboxSelector, 'checked');
     } else {
       // 現在の値を取得
       const currentValue = await target.$eval(selector, (el) => el.value);
@@ -289,6 +289,21 @@ async function clickIf(page, selector) {
   } catch (e) {
     console.warn('Click failed', selector);
   }
+}
+
+async function checkIf(page, selector) {
+    try {
+        await waitForSelector(page, selector);
+    } catch (e) {
+        console.warn('Check selector not found', selector);
+    }
+    try {
+      await page.evaluate((selector) => {
+        document.querySelector(selector).checked = true;
+      }, selector);
+    } catch (e) {
+        console.warn('Check failed', selector);
+    }
 }
 
 async function typeIf(page, selector, value) {
