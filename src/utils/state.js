@@ -6,6 +6,7 @@ const {INPUT_RESULT_FORM_INPUT_FORMAT_INVALID, INPUT_RESULT_SUBMIT_SELECTOR_NOT_
   INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG,
 } = require('./result');
 const {isContactForm7, isSucceedSendContactForm7} = require('./contactForm7');
+const cheerio = require("cheerio");
 const STATE_UNKNOWN = 'UNKNOWN';
 const STATE_INPUT = 'INPUT';
 const STATE_CONFIRM = 'CONFIRM';
@@ -26,12 +27,18 @@ const STATE_DONE = 'DONE';
 async function currentState(page, fields, lastStateUrl, inputResult, confirmResult, formId) {
   // デバッグモードの場合は、送信処理を行わなず、入力状態から変わらずにエラーになるので、完了状態を返す
   if (process.env.DEBUG === 'true' ||
-      (inputResult === INPUT_RESULT_COMPLETE && process.env.DEBUG_CONFIRM === 'true') ||
-      inputResult === INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG ||
-      confirmResult === CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG) {
+      inputResult === INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG) {
     console.log('Complete for debug');
     return STATE_COMPLETE;
   }
+
+  // 確認画面有りのデバッグモードの場合
+  if (confirmResult === CONFIRM_RESULT_NOT_SUBMIT_FOR_DEBUG) {
+    return STATE_COMPLETE;
+  }
+  // } else if ((inputResult === INPUT_RESULT_COMPLETE && process.env.DEBUG_CONFIRM === 'true')) {
+  //   return STATE_CONFIRM;
+  // }
 
   // inputで失敗している場合は、エラー状態を返す
   if (inputResult === INPUT_RESULT_FORM_INPUT_FORMAT_INVALID ||
@@ -140,24 +147,21 @@ async function checkErrorState(page, submitElements) {
 // HTMLコンテンツのクリーニング
 async function cleanHtmlContent(page) {
   console.log('cleanHtmlContent');
+  const $ = await cheerio.load(page.content(), {decodeEntities: false});
+  const html = removeHeaderFooterSidebar($);
+
+  let maxChildren = 0;
+  let deepestDiv = "";
+
   // 最も階層が深いdivを取得 (ヘッダーやサイドバー、フッターなどのテキストが含まれていない部分を取得したいため)
-  const deepestDiv = await page.evaluate(() => {
-    const divs = Array.from(document.querySelectorAll('div'));
-    let maxChildren = 0;
-    let deepestDiv = null;
-
-    divs.forEach((div) => {
-      const childrenCount = div.getElementsByTagName('*').length;
-      if (childrenCount > maxChildren) {
-        maxChildren = childrenCount;
-        deepestDiv = div;
-      }
-    });
-
-    return deepestDiv ? deepestDiv.outerHTML : null;
+  $('div', html).each((i, div) => {
+    const childrenCount = $(div).find('*').length;
+    if (childrenCount > maxChildren) {
+      maxChildren = childrenCount;
+      deepestDiv = div;
+    }
   });
-
-  const mainDiv = removeHeaderFooterSidebar(deepestDiv);
+  const mainDiv = deepestDiv ? $(deepestDiv).html() : "";
   const cleaned = removeAttributes(mainDiv);
 
   return cleaned;
