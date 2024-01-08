@@ -147,7 +147,8 @@ async function checkErrorState(page, submitElements) {
 // HTMLコンテンツのクリーニング
 async function cleanHtmlContent(page) {
   console.log('cleanHtmlContent');
-  const $ = await cheerio.load(page.content(), {decodeEntities: false});
+  const content = await page.content();
+  const $ = await cheerio.load(content, {decodeEntities: false});
   const html = removeHeaderFooterSidebar($);
 
   let maxChildren = 0;
