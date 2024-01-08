@@ -122,6 +122,7 @@ function getSymbol(inputResult, result) {
     case INPUT_RESULT_EXIST_RECAPTCHA:
       return 'リキャプチャ';
     case INPUT_RESULT_FORM_NOT_FOUND:
+      return 'フォームが存在しない'
     case INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG:
       return '-';
     default:
