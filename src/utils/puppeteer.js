@@ -232,9 +232,9 @@ async function setField(page, selector, tag, name, type, value, iframe) {
   }
 }
 
-async function setFieldByIndex(page, field, value, iframe) {
+async function setFieldByIndex(page, field, value, iframe, formTag) {
   const target = iframe.isIn ? iframe.frame : page;
-  const elements = await target.$$(`form ${field.tag}`);
+  const elements = await target.$$(`${formTag} ${field.tag}`);
   const element = elements[field.index];
   if (!element) {
     console.warn('Element not found', field);

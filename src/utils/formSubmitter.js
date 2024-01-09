@@ -9,9 +9,10 @@ const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DE
  * @param {object} formData
  * @param {object} inputData
  * @param {object} iframe
+ * @param {string} formTag
  * @return {Promise<void>}
  */
-async function fillFormFields(page, formData, inputData, iframe) {
+async function fillFormFields(page, formData, inputData, iframe, formTag) {
   console.log('fillFormFields');
   for (const field of formData.fields) {
     if (!field.name) {
@@ -38,7 +39,7 @@ async function fillFormFields(page, formData, inputData, iframe) {
       continue;
     }
     // フィールドに値がある場合、入力処理を行う
-    await handleFieldInput(page, field, sendValue, iframe);
+    await handleFieldInput(page, field, sendValue, iframe, formTag);
   }
 }
 
@@ -48,15 +49,16 @@ async function fillFormFields(page, formData, inputData, iframe) {
  * @param {object} field
  * @param {string} sendValue
  * @param {object} iframe
+ * @param {string} formTag
  * @return {Promise<void>}
  */
-async function handleFieldInput(page, field, sendValue, iframe) {
+async function handleFieldInput(page, field, sendValue, iframe, formTag) {
   if (field.index !== undefined) {
     console.log('handleFieldInputByIndex', field)
-    await setFieldByIndex(page, field, sendValue, iframe);
+    await setFieldByIndex(page, field, sendValue, iframe, formTag);
     return;
   }
-  const selector = getSelector(field); // セレクタを取得
+  const selector = getSelector(field, 'name', formTag); // セレクタを取得
   console.log(
       'Handling field:', field.name,
       'Selector:', selector,
@@ -80,26 +82,26 @@ async function handleFieldInput(page, field, sendValue, iframe) {
  * セレクタを取得する関数
  * @param {object} field
  * @param {string} attr
- * @param {boolean} includeFormTag
+ * @param {string} formTag
  * @return {null|string}
  */
-function getSelector(field, attr = 'name', includeFormTag = false) {
+function getSelector(field, attr = 'name', formTag) {
   const tag = field.tag;
   const value = field[attr];
   if (tag === 'a') {
     const onclick = field.onclick;
     if (onclick) {
-      return `${includeFormTag ? 'form ' : ''}${tag}[onclick="${onclick}"]`;
+      return `${formTag} ${tag}[onclick="${onclick}"]`;
     }
     const href = field.href;
     if (href) {
-      return `${includeFormTag ? 'form ' : ''}${tag}[href="${href}"]`;
+      return `${formTag} ${tag}[href="${href}"]`;
     }
-    return `${includeFormTag ? 'form ' : ''}${tag}`;
+    return `${formTag} ${tag}`;
   } else if (!tag || !value) {
     return null;
   }
-  return `${includeFormTag ? 'form ' : ''}${tag}[${attr}="${value}"]`;
+  return `${formTag} ${tag}[${attr}="${value}"]`;
 }
 
 /**
@@ -107,9 +109,10 @@ function getSelector(field, attr = 'name', includeFormTag = false) {
  * @param {object} page
  * @param {string} submit
  * @param {object} iframe
+ * @param {string} formTag
  * @return {Promise<string>}
  */
-async function submitForm(page, submit, iframe) {
+async function submitForm(page, submit, iframe, formTag) {
   console.log('submitForm');
   // スクリーンショットを撮る
   await takeScreenshot(page, 'input-before-submit');
@@ -120,7 +123,7 @@ async function submitForm(page, submit, iframe) {
   console.log("target is ", iframe.isIn ? "iframe" : "page");
 
   try {
-    const submitSelector = getSelector(submit, submit.class ? 'class' : 'type', true);
+    const submitSelector = getSelector(submit, submit.class ? 'class' : 'type', formTag);
     console.log('submitSelector', submitSelector);
     try {
       await waitForSelector(target, submitSelector);

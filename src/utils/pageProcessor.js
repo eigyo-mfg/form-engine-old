@@ -73,6 +73,9 @@ class PageProcessor {
     this.mappingPrompt = '';
     this.lastScreenshotPath = '';
     this.screenshotUrl = '';
+    this.formTag = 'form';
+    this.formHTML = '';
+    this.iframe = {};
   }
 
   /**
@@ -143,11 +146,13 @@ class PageProcessor {
     // 同意画面の処理
     await handleAgreement(this.page);
     // フォームのHTMLを返す
-    const {html: formHTML, iframe} = await getLongestElementHtmlAndIframeInfo(this.page, 'form');
-    if (!formHTML || formHTML.length === 0) {
-      console.log('No form found in the HTML. Exiting processOnInput...');
-      this.inputResult = INPUT_RESULT_FORM_NOT_FOUND;
-      return;
+    let {html: formHTML, iframe} = await getLongestElementHtmlAndIframeInfo(this.page, 'form');
+    this.formHTML = formHTML;
+    this.iframe = iframe;
+    if (!this.formHTML || this.formHTML.length === 0) {
+        console.log('No form found. Exiting processOnInput...');
+        this.inputResult = INPUT_RESULT_FORM_NOT_FOUND;
+        return;
     }
     // const {fields, submit} = analyzeFields(longestFormHTML);
     try {
@@ -160,13 +165,36 @@ class PageProcessor {
       this.inputResult = INPUT_RESULT_GET_FIELDS_ERROR;
       return;
     }
+    // FIXME Tableタグの一時対応追加
+    if (!this.submit || Object.keys(this.submit).length === 0) {
+      const {html: tableHTML, iframe: tableIframe } = await getLongestElementHtmlAndIframeInfo(this.page, 'table');
+      this.formHTML = tableHTML;
+      this.iframe = tableIframe;
+      this.formTag = 'table';
+      if (!tableHTML || tableHTML.length === 0) {
+        console.log('No form found in the HTML. Exiting processOnInput...');
+        this.inputResult = INPUT_RESULT_FORM_NOT_FOUND;
+        return;
+      }
+    }
+    try {
+      const {fields, submit} = getFieldsAndSubmit(this.formHTML);
+      this.fields = fields;
+      this.submit = submit;
+      console.log('Fields:', fields, 'Submit:', submit);
+    } catch (e) {
+      console.error(e);
+      this.inputResult = INPUT_RESULT_GET_FIELDS_ERROR;
+      return;
+    }
+
     if (!this.submit || Object.keys(this.submit).length === 0) {
       console.log('No submit button found. Exiting processOnInput...');
       this.inputResult = INPUT_RESULT_SUBMIT_BUTTON_NOT_FOUND;
       return;
     }
 
-    const formattedFormHTML = removeAttributes(formHTML);
+    const formattedFormHTML = removeAttributes(this.formHTML);
     console.log('Formatted form HTML:', formattedFormHTML);
 
     // 入力用データ取得
@@ -191,14 +219,14 @@ class PageProcessor {
     formatAndLogFormData(this.formMapping, inputData);
     // フォームに入力
     try {
-      await fillFormFields(this.page, this.formMapping, inputData, iframe);
+      await fillFormFields(this.page, this.formMapping, inputData, this.iframe, this.formTag);
     } catch (e) {
       console.error('Error while filling form fields:', e)
       this.inputResult = INPUT_RESULT_FILL_FORM_ERROR;
       return
     }
     // フォームを送信
-    await submitForm(this.page, this.submit, iframe)
+    await submitForm(this.page, this.submit, this.iframe, this.formTag)
         .then((result) => {
           console.log('Submit result:', result);
           this.inputResult = result;
@@ -236,7 +264,7 @@ class PageProcessor {
       const currentURL = this.page.url();
       console.log(`Current URL before clicking: ${currentURL}`);
 
-      let buttonsSelector = this.submit.tag === 'a' ? 'form a' : 'form button, form input[type="submit"]'
+      let buttonsSelector = this.submit.tag === 'a' ? `${this.formTag} a` : `${this.formTag} button, ${this.formTag} input[type="submit"]`
       let buttons = await this.page.$$(buttonsSelector);
       console.log(`Found ${buttons.length} buttons`);
       if (buttons.length === 0) {
