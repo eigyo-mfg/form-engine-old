@@ -211,22 +211,22 @@ function getSubmitElement(formHtml) {
   console.warn('No submit button found. Trying to find submit link...');
   // const submitTexts = ['送信', '確認', '申込', '次へ', '進む'];
   const submitTexts = ['送', '確', '申', '次', '進'];
-  // 全てのaタグのテキストを検証して、対象があれば送信ボタンとして扱う
-  $('a').each((_, el) => {
-    const text = $(el).text();
-    if (submitTexts.some((submitText) => text.includes(submitText))) {
+  // 全てのinputボタンのテキストを検証して、対象があれば送信ボタンとして扱う
+  $('input[type="button"], button[type="button"]').each((_, el) => {
+    const text = $(el).val();
+    if (text && submitTexts.some((submitText) => text.includes(submitText))) {
       submitEl = $(el);
     }
   });
   if (submitEl.length > 0) {
     return submitEl;
   }
-  // 全てのinputボタンのテキストを検証して、対象があれば送信ボタンとして扱う
-  $('input[type="button"], button[type="button"]').each((_, el) => {
-      const text = $(el).val();
-      if (text && submitTexts.some((submitText) => text.includes(submitText))) {
-        submitEl = $(el);
-      }
+  // 全てのbutton, aタグのテキストを検証して、対象があれば送信ボタンとして扱う
+  $('button, a').each((_, el) => {
+    const text = $(el).text();
+    if (submitTexts.some((submitText) => text.includes(submitText))) {
+      submitEl = $(el);
+    }
   });
   if (submitEl.length > 0) {
     return submitEl;
