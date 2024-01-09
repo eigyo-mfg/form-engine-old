@@ -79,7 +79,7 @@ async function handleAgreement(page) {
   console.log('handleAgreement');
   try {
     // チェックボックスがあればクリック
-    await clickElement(page, '//input[@type=\'checkbox\']', 0);
+    await clickElement(page, '//input[@type=\'checkbox\']', 10000);
     // 同意ボタンがあればクリック
     await clickElement(
         page,
@@ -334,6 +334,17 @@ async function selectIf(page, selector, value) {
   }
 }
 
+async function checkActiveFrame(frame) {
+  try {
+    const url = frame.url();
+    console.log(`Frame URL: ${url}`);
+    return true;
+  } catch (error) {
+    console.error(`Frame is not active: ${error.message}`);
+    return false;
+  }
+}
+
 module.exports = {
   launchBrowser,
   newPage,
@@ -346,4 +357,5 @@ module.exports = {
   waitForSelector,
   waitForNavigation,
   waitForTimeout,
+  checkActiveFrame,
 };

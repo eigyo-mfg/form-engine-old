@@ -243,9 +243,18 @@ function getSubmitElement(formHtml) {
     return submitEl;
   }
   // input[type=image]の画像を検証, alt属性に対象があれば送信ボタンとして扱う
+  const submitTextsForImageInput = ['submit', 'confirm', 'kakunin'];
   $('input[type="image"]').each((_, el) => {
     const alt = $(el).attr('alt');
     if (alt && submitTexts.some((submitText) => alt.includes(submitText))) {
+      submitEl = $(el);
+    }
+    const src = $(el).attr('src');
+    if (src && submitTextsForImageInput.some((submitText) => src.includes(submitText))) {
+      submitEl = $(el);
+    }
+    const name = $(el).attr('name');
+    if (name && submitTextsForImageInput.some((submitText) => name.includes(submitText))) {
       submitEl = $(el);
     }
   });
