@@ -280,6 +280,14 @@ function getSubmitElement(formHtml) {
       submitEl = $(el);
       }
   });
+  // div要素を検証, onclickに対象テキストがあれば送信ボタンとして扱う
+  $('div').each((_, el) => {
+    const submitTextsOnClick = ['submit', 'confirm'];
+    const onclick = $(el).attr('onclick');
+    if (onclick && submitTextsOnClick.some((submitText) => onclick.includes(submitText))) {
+      submitEl = $(el);
+    }
+  });
   console.warn('Tried to find submit element for all possible cases but failed. Returning empty element.')
   return submitEl;
 }
