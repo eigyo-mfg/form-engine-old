@@ -266,7 +266,7 @@ function getSubmitElement(formHtml) {
     return submitEl;
   }
   // 画像の要素を検証, alt属性に対象があれば送信ボタンとして扱う
-  $('image').each((_, el) => {
+  $('image, img').each((_, el) => {
     const alt = $(el).attr('alt');
     if (alt && submitTextsForImage.some((submitText) => alt.includes(submitText))) {
       submitEl = $(el);
