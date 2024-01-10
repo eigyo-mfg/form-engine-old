@@ -117,8 +117,9 @@ function getSymbol(inputResult, result) {
     case INPUT_RESULT_MAPPING_ERROR:
     case INPUT_RESULT_GET_FIELDS_ERROR:
     case INPUT_RESULT_FILL_FORM_ERROR:
-    case INPUT_RESULT_SUBMIT_BUTTON_NOT_FOUND:
       return '×';
+    case INPUT_RESULT_SUBMIT_BUTTON_NOT_FOUND:
+      return '送信ボタンの検出に失敗';
     case INPUT_RESULT_EXIST_RECAPTCHA:
       return 'リキャプチャ';
     case INPUT_RESULT_FORM_NOT_FOUND:
