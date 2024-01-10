@@ -291,6 +291,10 @@ function getSubmitElement(formHtml) {
       submitEl = $(el);
     }
   });
+  // 最後のinputボタンを対象にする
+  if (submitEl.length === 0) {
+      submitEl = $('input[type="button"], button[type="button"]').last();
+  }
   console.warn('Tried to find submit element for all possible cases but failed. Returning empty element.')
   return submitEl;
 }
