@@ -19,6 +19,7 @@ async function extractFormHTML(page) {
       }
     }
   });
+
   // formタグが見つからない場合、iframe内のformタグを抽出
   if (formsHTML.length === 0) {
     const iframes = await page.$$('iframe');
@@ -363,7 +364,7 @@ function removeAttributes(html) {
   // 個人情報・プライバシーに関するpタグは削除する
   $('p, li').each(function() {
     const text = $(this).text();
-    console.log('text', text)
+    // console.log('text', text)
     if (text.includes('個人情報') || text.includes('プライバシー') || text.includes('改訂') || text === '') {
       $(this).remove();
     }
