@@ -25,6 +25,7 @@ const STATE_DONE = 'DONE';
  * @return {Promise<string>}
  */
 async function currentState(page, fields, lastStateUrl, inputResult, confirmResult, formId) {
+  console.log('currentState:', inputResult, confirmResult)
   // デバッグモードの場合は、送信処理を行わなず、入力状態から変わらずにエラーになるので、完了状態を返す
   if (process.env.DEBUG === 'true' ||
       inputResult === INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG) {
@@ -57,6 +58,7 @@ async function currentState(page, fields, lastStateUrl, inputResult, confirmResu
   if (isCf7) {
     const isSucceedSendCf7 = await isSucceedSendContactForm7(page);
     if (isSucceedSendCf7) {
+      console.log('isSucceedSendCf7')
       return STATE_COMPLETE;
     }
   }
@@ -64,6 +66,7 @@ async function currentState(page, fields, lastStateUrl, inputResult, confirmResu
   // URLから状態を判定する
   const stateByUrl = await checkStateByUrl(page, lastStateUrl);
   if (stateByUrl !== null) {
+    console.log('stateByUrl:', stateByUrl)
     return stateByUrl;
   }
 
@@ -72,6 +75,7 @@ async function currentState(page, fields, lastStateUrl, inputResult, confirmResu
   // エラー状態か確認する
   const isError = await checkErrorState(page, submitElements);
   if (isError) {
+    console.log('isError')
     return STATE_ERROR;
   }
 
@@ -121,8 +125,10 @@ async function checkErrorState(page, submitElements) {
     // submitボタンのテキストに、「確認」または「次へ」が含まれるか
     const confirmTexts = ['確認', '次へ'];
     if (submitButtonTexts.some((text) => confirmTexts.some((confirmText) => text.includes(confirmText)))) {
+      console.log('confirmTexts')
       // submitボタンのテキストに、「送信」が含まれるか
       if (!submitButtonTexts.some((text) => text.includes('送信'))) {
+        console.log('submitButtonTexts')
         // 入力画面から変わっていない
         return true;
       }
@@ -131,6 +137,7 @@ async function checkErrorState(page, submitElements) {
 
   // :invalid要素が存在する場合は、エラー状態と判定する
   const invalidElements = await page.$$('input:invalid');
+  console.log('invalidElements:', invalidElements.length)
   return invalidElements.length !== 0;
 }
 
