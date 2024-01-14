@@ -264,7 +264,7 @@ class PageProcessor {
       const currentURL = this.page.url();
       console.log(`Current URL before clicking: ${currentURL}`);
 
-      let buttonsSelector = this.submit.tag === 'a' ? `${this.formTag} a` : `${this.formTag} button, ${this.formTag} input[type="submit"]`
+      let buttonsSelector = this.submit.tag === 'a' ? `${this.formTag} a` : `${this.formTag} button, ${this.formTag} input[type="${this.submit.type}"]`
       let buttons = await this.page.$$(buttonsSelector);
       console.log(`Found ${buttons.length} buttons`);
       if (buttons.length === 0) {
@@ -280,7 +280,7 @@ class PageProcessor {
 
       for (const button of buttons) {
         const buttonText = await this.page.evaluate(
-            (el) => el.textContent || el.value,
+            (el) => el.textContent || el.value || el.alt,
             button,
         );
         const onClickAttribute = await this.page.evaluate(
@@ -297,7 +297,7 @@ class PageProcessor {
 
         // 送信ボタンか判定
         const submitTexts = ['送'];
-        if (submitTexts.some((text) => buttonText.includes(text))) {
+        if (submitTexts.some((text) => buttonText && buttonText.includes(text))) {
           console.log('Matching button found. Taking screenshot...');
           await takeScreenshot(this.page, 'confirm');
 
