@@ -1,6 +1,7 @@
 const {takeScreenshot, setField, waitForSelector, waitForTimeout, setFieldByIndex} = require('./puppeteer');
 const {INPUT_RESULT_COMPLETE, INPUT_RESULT_ERROR, INPUT_RESULT_NOT_SUBMIT_FOR_DEBUG,
   INPUT_RESULT_SUBMIT_SELECTOR_NOT_FOUND, INPUT_RESULT_FORM_INPUT_FORMAT_INVALID,
+  INPUT_RESULT_SUBMIT_SELECTOR_CLICK_FAILED,
 } = require('./result');
 
 /**
@@ -97,6 +98,9 @@ function getSelector(field, attr = 'name', formTag) {
     if (href) {
       return `${formTag} ${tag}[href="${href}"]`;
     }
+    if (value) {
+        return `${formTag} ${tag}[${attr}="${value}"]`;
+    }
     return `${formTag} ${tag}`;
   } else if (!tag || !value) {
     return null;
@@ -141,7 +145,17 @@ async function submitForm(page, submit, iframe, formTag) {
     // MutationObserverをセット
     await setupDialogAndMutationObserver(target);
     // 送信ボタンクリック
-    await target.click(submitSelector);
+    console.log('click', submitSelector)
+    try {
+      await target.click(submitSelector);
+    } catch (e) {
+      try {
+        await target.evaluate((el) => el.click(), submitSelector);
+      } catch (e) {
+        console.warn('Failed to click submit selector:', submitSelector);
+        return INPUT_RESULT_SUBMIT_SELECTOR_CLICK_FAILED;
+      }
+    }
     await takeScreenshot(page, 'input-submit-clicked');
 
     // 送信結果の失敗・成功を確認する
