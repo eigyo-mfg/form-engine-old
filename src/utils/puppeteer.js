@@ -298,11 +298,16 @@ async function checkIf(page, selector) {
         console.warn('Check selector not found', selector);
     }
     try {
-      await page.evaluate((selector) => {
-        document.querySelector(selector).checked = true;
-      }, selector);
+        await page.click(selector);
     } catch (e) {
+      console.log('click failed, try to set check value');
+      try {
+        await page.evaluate((selector) => {
+          document.querySelector(selector).checked = true;
+        }, selector);
+      } catch (e) {
         console.warn('Check failed', selector);
+      }
     }
 }
 
