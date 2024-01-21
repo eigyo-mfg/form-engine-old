@@ -77,6 +77,7 @@ Observe the following points when creating the mapping:
 - Mapping the characters displayed in the html, not the "name" of the field, as important. Similarly, data used for inquiries should be mapped based on value, not only key name.
 - The html often shows example inputs, so be sure to refer to them for mapping.
 - With the exception of email addresses, the same data should not be mapped to more than one field. However, if mapping is not possible, nothing_else should be mapped.
+- The "inquiry_content" in "inquiries" must be mapped to one of the fields.
 
 The output should look like this:
 {"fields":[{"name":"lastname_kana","tag":"input","type":"text","value":"last_name_kana"},{"name":"company","tag":"input","type":"text","value":"company_name"},{"name":"select_field","tag":"select","values":["a","b","c"],"value":"b"},{"name":"checkbox_field","tag":"input","type":"checkbox","values":["one","two","three"],"value":"three"},…]}

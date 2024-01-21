@@ -336,6 +336,11 @@ async function selectIf(page, selector, value) {
     await page.select(selector, value);
   } catch (e) {
     console.warn('Select failed', selector);
+    const options = await page.$$(`${selector} option`);
+    const lastOptionValue = await page.evaluate(element => element.value, options[options.length - 1]);
+    // 最後のオプションを選択する
+    console.log('Select last option', selector, lastOptionValue)
+    await page.select(selector, lastOptionValue);
   }
 }
 
