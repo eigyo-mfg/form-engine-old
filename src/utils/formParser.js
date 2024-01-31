@@ -183,7 +183,9 @@ function mergeFields(fields) {
 
 function getSubmitElement(formHtml) {
   const $ = cheerio.load(formHtml);
-  let submitEl = $('button[type="submit"], input[type="submit"]');
+  let submitEl = $('button[type="submit"], input[type="submit"]').filter(function() {
+    return !$(this).parent().is(':hidden');
+  });
   if (submitEl.length > 0) {
     return submitEl;
   }
