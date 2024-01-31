@@ -194,9 +194,13 @@ function getSubmitElement(formHtml) {
   const submitTexts = ['送', '確', '申', '次', '進', 'confirm', 'submit', 'send', 'next', '問い合わせ'];
   // 全てのinputボタンのテキストを検証して、対象があれば送信ボタンとして扱う
   $('input[type="button"], button[type="button"]').each((_, el) => {
-    const text = $(el).val();
-    if (text && submitTexts.some((submitText) => text.includes(submitText))) {
-      submitEl = $(el);
+    const $el = $(el);
+    const text = $el.val();
+    const id = $el.attr('id');
+    const classes = $el.attr('class');
+    const attributes = [text, id, classes];
+    if (attributes.some(attr => attr && submitTexts.some(submitText => attr.includes(submitText)))) {
+      submitEl = $el;
     }
   });
   if (submitEl.length > 0) {
