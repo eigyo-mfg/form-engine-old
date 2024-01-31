@@ -90,10 +90,7 @@ function getSelector(field, attr = 'name', formTag, formAction) {
   const tag = field.tag;
   const value = field[attr];
 
-  if (formTag === 'form') {
-    if (!formAction) {
-      return null;
-    }
+  if (formTag === 'form' && formAction) {
     return `${formTag}[action="${formAction}"] ${tag}[${attr}="${value}"]`;
   }
 
