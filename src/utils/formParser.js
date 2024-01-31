@@ -7,32 +7,29 @@ async function extractFormHTML(page) {
   // formタグを抽出
   const html = await page.content();
   const $ = cheerio.load(html);
-  const formsHTML = [];
+  let maxInputFormHTML = '';
+  let maxInputCount = 0;
   $('form').each(function() {
-    if ($(this).find('input').length > 1) {
-      if (
-        $(this).find(
-            'input[type="search"], input[name="q"], input[placeholder="検索"]',
-        ).length === 0
-      ) {
-        formsHTML.push($(this).html());
-      }
+    const inputCount = $(this).find('input').length;
+    if (inputCount > maxInputCount && $(this).find('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+      maxInputFormHTML = $(this).html();
+      maxInputCount = inputCount;
     }
   });
-
   // formタグが見つからない場合、iframe内のformタグを抽出
-  if (formsHTML.length === 0) {
+  if (maxInputFormHTML.length === 0) {
     const iframes = await page.$$('iframe');
     for (const iframe of iframes) {
       try {
         const frame = await iframe.contentFrame();
         await frame.waitForSelector('form', {timeout: 10000});
-
         const iframeHTML = await frame.content();
         const $iframe = cheerio.load(iframeHTML);
         $iframe('form').each(function() {
-          if ($iframe(this).find('input').length > 1) {
-            formsHTML.push($iframe(this).html());
+          const inputCount = $iframe(this).find('input').length;
+          if (inputCount > maxInputCount) {
+            maxInputFormHTML = $iframe(this).html();
+            maxInputCount = inputCount;
           }
         });
       } catch (error) {
@@ -40,43 +37,24 @@ async function extractFormHTML(page) {
       }
     }
   }
-  // 複数HTMLが取得されている場合は長いHTMLを優先
-  let longestFormHTML = formsHTML.reduce(
-      (a, b) => (a.length > b.length ? a : b),
-      '',
-  );
   // 最後にformが見つかっていない場合は生のHTMLを取得しform-form部分を抜き出す
-  if (longestFormHTML.length === 0) {
-    console.log(
-        'No form found in the initial HTML. Trying to fetch raw HTML...',
-    );
+  if (maxInputFormHTML.length === 0) {
+    console.log('No form found in the initial HTML. Trying to fetch raw HTML...');
     await page.setRequestInterception(true);
     let responseProcessingPromise = null;
     const url = page.url();
     page.on('response', async (response) => {
-      if (
-        response.url() === url &&
-        response.request().resourceType() === 'document'
-      ) {
+      if (response.url() === url && response.request().resourceType() === 'document') {
         responseProcessingPromise = (async () => {
           const source_website_html_content = await response.text();
           const startIndex = source_website_html_content.indexOf('form');
-          const endIndex =
-            source_website_html_content.lastIndexOf('form') + 'form'.length;
-          const formHTML = source_website_html_content.slice(
-              startIndex,
-              endIndex,
-          );
+          const endIndex = source_website_html_content.lastIndexOf('form') + 'form'.length;
+          const formHTML = source_website_html_content.slice(startIndex, endIndex);
           const $ = cheerio.load(formHTML);
-          if (
-            $('input').length > 1 &&
-            $(
-                'input[type="search"], input[name="q"], input[placeholder="検索"]',
-            ).length === 0
-          ) {
-            return formHTML;
-          } else {
-            return '';
+          const inputCount = $('input').length;
+          if (inputCount > maxInputCount && $('input[type="search"], input[name="q"], input[placeholder="検索"]').length === 0) {
+            maxInputFormHTML = formHTML;
+            maxInputCount = inputCount;
           }
         })();
       }
@@ -84,10 +62,10 @@ async function extractFormHTML(page) {
     await page.goto(url);
     await page.setRequestInterception(true);
     if (responseProcessingPromise) {
-      longestFormHTML = await responseProcessingPromise; // 戻り値をlongestFormHTMLに代入
+      await responseProcessingPromise;
     }
   }
-  return longestFormHTML; // 最長のフォームHTMLを返す
+  return maxInputFormHTML; // 最も多くのinputを持つフォームHTMLを返す
 }
 
 /**

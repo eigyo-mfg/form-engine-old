@@ -141,20 +141,31 @@ async function getLongestElement(frame, tag) {
  */
 async function getLongestElementHtmlAndIframeInfo(page, tagName = "form") {
   let longestElementHtml = await getLongestElement(page, tagName);
+  let longestElementAction = await page.evaluate((html) => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    return doc.querySelector('form')?.getAttribute('action') || null;
+  }, longestElementHtml);
 
   let longestIframeElementHtml = null;
+  let longestIframeElementAction = null;
   let iframeInfo = {
     isIn: false,
     frame: null,
     url: '',
     name: '',
   };
-
   const frames = await page.frames();
   for (const frame of frames) {
     const iframeElementHtml = await getLongestElement(frame, tagName);
+    const iframeElementAction = await frame.evaluate((html) => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      return doc.querySelector('form')?.getAttribute('action') || null;
+    }, iframeElementHtml);
     if (iframeElementHtml && (!longestIframeElementHtml || iframeElementHtml.length > longestIframeElementHtml.length)) {
       longestIframeElementHtml = iframeElementHtml;
+      longestIframeElementAction = iframeElementAction;
       iframeInfo = {
         isIn: true,
         frame: frame,
@@ -163,13 +174,13 @@ async function getLongestElementHtmlAndIframeInfo(page, tagName = "form") {
       };
     }
   }
-
   if (longestIframeElementHtml && (!longestElementHtml || longestIframeElementHtml.length > longestElementHtml.length)) {
     longestElementHtml = longestIframeElementHtml;
+    longestElementAction = longestIframeElementAction;
   }
-
   return {
     html: longestElementHtml,
+    action: longestElementAction,
     iframe: iframeInfo,
   };
 }

@@ -86,9 +86,17 @@ async function handleFieldInput(page, field, sendValue, iframe, formTag) {
  * @param {string} formTag
  * @return {null|string}
  */
-function getSelector(field, attr = 'name', formTag) {
+function getSelector(field, attr = 'name', formTag, formAction) {
   const tag = field.tag;
   const value = field[attr];
+
+  if (formTag === 'form') {
+    if (!formAction) {
+      return null;
+    }
+    return `${formTag}[action="${formAction}"] ${tag}[${attr}="${value}"]`;
+  }
+
   if (tag === 'a') {
     const onclick = field.onclick;
     if (onclick) {
@@ -99,14 +107,16 @@ function getSelector(field, attr = 'name', formTag) {
       return `${formTag} ${tag}[href="${href}"]`;
     }
     if (value) {
-        return `${formTag} ${tag}[${attr}="${value}"]`;
+      return `${formTag} ${tag}[${attr}="${value}"]`;
     }
     return `${formTag} ${tag}`;
   } else if (!tag || !value) {
     return null;
   }
+
   return `${formTag} ${tag}[${attr}="${value}"]`;
 }
+
 
 /**
  * フォームを送信する関数
@@ -114,9 +124,10 @@ function getSelector(field, attr = 'name', formTag) {
  * @param {string} submit
  * @param {object} iframe
  * @param {string} formTag
+ * @param {string} formAction
  * @return {Promise<string>}
  */
-async function submitForm(page, submit, iframe, formTag) {
+async function submitForm(page, submit, iframe, formTag, formAction) {
   console.log('submitForm');
   // スクリーンショットを撮る
   await takeScreenshot(page, 'input-before-submit');
@@ -127,7 +138,7 @@ async function submitForm(page, submit, iframe, formTag) {
   console.log("target is ", iframe.isIn ? "iframe" : "page");
 
   try {
-    const submitSelector = getSelector(submit, submit.class ? 'class' : 'type', formTag);
+    const submitSelector = getSelector(submit, submit.class ? 'class' : 'type', formTag, formAction);
     console.log('submitSelector', submitSelector);
     try {
       await waitForSelector(target, submitSelector);

@@ -75,6 +75,7 @@ class PageProcessor {
     this.screenshotUrl = '';
     this.formTag = 'form';
     this.formHTML = '';
+    this.formAction = '';
     this.iframe = {};
   }
 
@@ -167,8 +168,9 @@ class PageProcessor {
     }
     // FIXME Tableタグの一時対応追加
     if (!this.submit || Object.keys(this.submit).length === 0) {
-      const {html: tableHTML, iframe: tableIframe } = await getLongestElementHtmlAndIframeInfo(this.page, 'table');
+      const {html: tableHTML, iframe: tableIframe, action } = await getLongestElementHtmlAndIframeInfo(this.page, 'table');
       this.formHTML = tableHTML;
+      this.formAction = action;
       this.iframe = tableIframe;
       this.formTag = 'table';
       if (!tableHTML || tableHTML.length === 0) {
@@ -226,7 +228,7 @@ class PageProcessor {
       return
     }
     // フォームを送信
-    await submitForm(this.page, this.submit, this.iframe, this.formTag)
+    await submitForm(this.page, this.submit, this.iframe, this.formTag, this.formAction)
         .then((result) => {
           console.log('Submit result:', result);
           this.inputResult = result;
