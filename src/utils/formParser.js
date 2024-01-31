@@ -189,7 +189,7 @@ function getSubmitElement(formHtml) {
   }
   console.warn('No submit button found. Trying to find submit link...');
   // const submitTexts = ['送信', '確認', '申込', '次へ', '進む'];
-  const submitTexts = ['送', '確', '申', '次', '進'];
+  const submitTexts = ['送', '確', '申', '次', '進', 'confirm', 'submit', 'send', 'next'];
   // 全てのinputボタンのテキストを検証して、対象があれば送信ボタンとして扱う
   $('input[type="button"], button[type="button"]').each((_, el) => {
     const text = $(el).val();
@@ -222,7 +222,7 @@ function getSubmitElement(formHtml) {
     return submitEl;
   }
   const submitTextsForImage = ['送信', '確認', '申込', '次へ', '進む'];
-  const submitTextsForImageInput = ['submit', 'confirm', 'kakunin'];
+  const submitTextsForImageInput = ['submit', 'confirm', 'kakunin', 'next', 'send', 'soushin', 'susumu'];
   // input[type=image]の画像を検証, alt属性に対象があれば送信ボタンとして扱う
   $('input[type="image"]').each((_, el) => {
     const alt = $(el).attr('alt');
